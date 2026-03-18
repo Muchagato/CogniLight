@@ -1,41 +1,80 @@
+using CogniLight.Api.Data;
+using CogniLight.Api.Hubs;
+using CogniLight.Api.Services;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+// Database
+var connectionString = builder.Configuration.GetConnectionString("Default")
+    ?? "Data Source=cognilight.db";
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite(connectionString));
+
+// Services
+builder.Services.AddSingleton<TelemetryService>();
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<SimulationEngine>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<SimulationEngine>());
+
+// CORS — allow Angular dev server
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("http://localhost:4200")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Ensure database is created
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.EnsureCreated();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+app.UseCors();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+// REST endpoints
+var api = app.MapGroup("/api");
 
-app.MapGet("/weatherforecast", () =>
+api.MapGet("/telemetry/latest", async (TelemetryService svc) =>
+    await svc.GetLatestReadingsAsync());
+
+api.MapGet("/telemetry/{poleId}", async (string poleId, TelemetryService svc) =>
+    await svc.GetReadingsByPoleAsync(poleId));
+
+api.MapGet("/telemetry/anomalies", async (TelemetryService svc) =>
+    await svc.GetAnomaliesAsync());
+
+api.MapGet("/simulation/status", (SimulationEngine engine) =>
+    new { time = engine.GetSimulationTime().ToString("o") });
+
+api.MapPost("/simulation/speed/{multiplier:int}", (int multiplier, SimulationEngine engine) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    engine.SetSpeed(multiplier);
+    return Results.Ok(new { speed = multiplier });
+});
+
+api.MapPost("/simulation/toggle", (SimulationEngine engine) =>
+{
+    // Toggle is handled via query param
+    return Results.Ok();
+});
+
+// SignalR hub
+app.MapHub<TelemetryHub>("/hubs/telemetry");
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
