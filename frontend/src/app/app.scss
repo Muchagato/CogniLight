@@ -14,6 +14,12 @@
   color: #f59e0b;
   letter-spacing: 1px;
   font-family: monospace;
+  text-decoration: none;
+}
+
+main {
+  height: calc(100vh - 48px);
+  overflow: hidden;
 }
 
 .nav-links {
@@ -39,7 +45,3 @@
   }
 }
 
-main {
-  height: calc(100vh - 48px);
-  overflow-y: auto;
-}

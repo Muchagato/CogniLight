@@ -1,16 +1,10 @@
 import { Routes } from '@angular/router';
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
   {
-    path: 'simulation',
+    path: '',
     loadComponent: () =>
-      import('./simulation/simulation.component').then(m => m.SimulationComponent),
-  },
-  {
-    path: 'dashboard',
-    loadComponent: () =>
-      import('./dashboard/dashboard.component').then(m => m.DashboardComponent),
+      import('./home/home.component').then(m => m.HomeComponent),
   },
   {
     path: 'chat',

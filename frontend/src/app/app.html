@@ -1,8 +1,7 @@
 <nav class="top-nav">
-  <span class="brand">CogniLight</span>
+  <a class="brand" routerLink="/">CogniLight</a>
   <div class="nav-links">
-    <a routerLink="/simulation" routerLinkActive="active">Simulation</a>
-    <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
+    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Overview</a>
     <a routerLink="/chat" routerLinkActive="active">AI Chat</a>
   </div>
 </nav>
