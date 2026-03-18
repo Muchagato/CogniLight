@@ -1,0 +1,22 @@
+<div class="simulation-container">
+  <div class="sim-toolbar">
+    <div class="sim-info">
+      <span class="connection-dot" [class.on]="connected"></span>
+      <span class="sim-time">{{ simulationTime | date:'HH:mm' : 'UTC' }}</span>
+    </div>
+    <div class="sim-controls">
+      <button class="ctrl-btn" (click)="toggleRunning()">
+        {{ running ? 'Pause' : 'Play' }}
+      </button>
+      @for (s of [1, 2, 5, 10]; track s) {
+        <button class="ctrl-btn" [class.active]="speed === s" (click)="setSpeed(s)">
+          {{ s }}x
+        </button>
+      }
+    </div>
+    @if (selectedPoleId) {
+      <span class="selected-pole">Selected: {{ selectedPoleId }}</span>
+    }
+  </div>
+  <canvas #simCanvas class="sim-canvas"></canvas>
+</div>

@@ -1,28 +1,77 @@
-import { Component } from '@angular/core';
+import {
+  Component, ElementRef, ViewChild, AfterViewInit,
+  OnDestroy, inject, NgZone
+} from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Subject, takeUntil } from 'rxjs';
+import { TelemetryService } from '../shared/services/telemetry.service';
+import { TelemetryReading } from '../shared/models/telemetry.model';
+import { SimulationRenderer } from './simulation.renderer';
 
 @Component({
   selector: 'app-simulation',
   standalone: true,
-  template: `
-    <div class="simulation-placeholder">
-      <h2>Street Simulation</h2>
-      <p>Canvas-based street view will be implemented in Phase 2.</p>
-    </div>
-  `,
-  styles: [`
-    .simulation-placeholder {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 400px;
-      background: #1e293b;
-      color: #f59e0b;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      margin: 16px;
-    }
-    p { color: #94a3b8; margin-top: 8px; }
-  `]
+  imports: [CommonModule],
+  templateUrl: './simulation.component.html',
+  styleUrl: './simulation.component.scss',
 })
-export class SimulationComponent {}
+export class SimulationComponent implements AfterViewInit, OnDestroy {
+  @ViewChild('simCanvas', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
+
+  private readonly telemetry = inject(TelemetryService);
+  private readonly zone = inject(NgZone);
+  private readonly destroy$ = new Subject<void>();
+  private renderer!: SimulationRenderer;
+
+  simulationTime = '';
+  connected = false;
+  selectedPoleId: string | null = null;
+  speed = 1;
+  running = true;
+
+  ngAfterViewInit(): void {
+    const canvas = this.canvasRef.nativeElement;
+    this.renderer = new SimulationRenderer(canvas);
+    this.renderer.onPoleSelected = (poleId) => {
+      this.zone.run(() => { this.selectedPoleId = poleId; });
+    };
+
+    this.telemetry.readings$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(readings => this.renderer.updateReadings(readings));
+
+    this.telemetry.simulationTime$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(time => {
+        this.simulationTime = time;
+        this.renderer.updateTime(time);
+      });
+
+    this.telemetry.connected$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(c => this.connected = c);
+
+    // Run animation loop outside Angular zone for performance
+    this.zone.runOutsideAngular(() => this.renderer.startLoop());
+  }
+
+  setSpeed(speed: number): void {
+    this.speed = speed;
+    this.telemetry.setSpeed(speed);
+  }
+
+  toggleRunning(): void {
+    this.running = !this.running;
+    if (this.running) {
+      this.telemetry.resume();
+    } else {
+      this.telemetry.pause();
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+    this.renderer.destroy();
+  }
+}

@@ -18,13 +18,16 @@ public class SimulationEngine : IHostedService, IDisposable
     private static readonly string[] PoleIds =
         Enumerable.Range(1, 12).Select(i => $"POLE-{i:D2}").ToArray();
 
-    // Pole positions (normalized 0-1 grid for a city block with intersection)
+    // Pole positions (normalized 0-1) along two vertical streets with horizontal crossroad
+    // Left street at x≈0.25, right street at x≈0.75
+    // Horizontal crossroad at y≈0.5
     private static readonly (double X, double Y)[] PolePositions =
     [
-        (0.15, 0.1), (0.15, 0.3), (0.15, 0.5),   // Left street, west side
-        (0.35, 0.1), (0.35, 0.3), (0.35, 0.5),   // Left street, east side
-        (0.65, 0.1), (0.65, 0.3), (0.65, 0.5),   // Right street, west side
-        (0.85, 0.1), (0.85, 0.3), (0.85, 0.5),   // Right street, east side
+        (0.22, 0.12), (0.22, 0.35), (0.22, 0.65), (0.22, 0.88),  // Left street, west side
+        (0.32, 0.12), (0.32, 0.35),                                // Left street, east side (top)
+        (0.32, 0.65), (0.32, 0.88),                                // Left street, east side (bottom)
+        (0.68, 0.12), (0.68, 0.50),                                // Right street, west side
+        (0.78, 0.35), (0.78, 0.88),                                // Right street, east side
     ];
 
     public SimulationEngine(
@@ -211,9 +214,20 @@ public class SimulationEngine : IHostedService, IDisposable
         return k - 1;
     }
 
+    public int SpeedMultiplier => _speedMultiplier;
+    public bool IsRunning => _running;
+
     public void SetSpeed(int multiplier) => _speedMultiplier = Math.Clamp(multiplier, 1, 10);
     public void SetRunning(bool running) => _running = running;
     public DateTime GetSimulationTime() => _simulationTime;
+
+    public static object[] GetPoleLayout() =>
+        PoleIds.Select((id, i) => new
+        {
+            poleId = id,
+            x = PolePositions[i].X,
+            y = PolePositions[i].Y
+        }).ToArray<object>();
 
     public void Dispose()
     {

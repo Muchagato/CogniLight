@@ -44,6 +44,20 @@ export class TelemetryService implements OnDestroy {
     }
   }
 
+  private readonly apiBase = 'http://localhost:5000/api';
+
+  async setSpeed(multiplier: number): Promise<void> {
+    await fetch(`${this.apiBase}/simulation/speed/${multiplier}`, { method: 'POST' });
+  }
+
+  async pause(): Promise<void> {
+    await fetch(`${this.apiBase}/simulation/pause`, { method: 'POST' });
+  }
+
+  async resume(): Promise<void> {
+    await fetch(`${this.apiBase}/simulation/resume`, { method: 'POST' });
+  }
+
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();

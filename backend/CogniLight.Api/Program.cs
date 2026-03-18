@@ -60,7 +60,14 @@ api.MapGet("/telemetry/anomalies", async (TelemetryService svc) =>
     await svc.GetAnomaliesAsync());
 
 api.MapGet("/simulation/status", (SimulationEngine engine) =>
-    new { time = engine.GetSimulationTime().ToString("o") });
+    new
+    {
+        time = engine.GetSimulationTime().ToString("o"),
+        running = engine.IsRunning,
+        speed = engine.SpeedMultiplier
+    });
+
+api.MapGet("/simulation/poles", () => SimulationEngine.GetPoleLayout());
 
 api.MapPost("/simulation/speed/{multiplier:int}", (int multiplier, SimulationEngine engine) =>
 {
@@ -68,10 +75,16 @@ api.MapPost("/simulation/speed/{multiplier:int}", (int multiplier, SimulationEng
     return Results.Ok(new { speed = multiplier });
 });
 
-api.MapPost("/simulation/toggle", (SimulationEngine engine) =>
+api.MapPost("/simulation/pause", (SimulationEngine engine) =>
 {
-    // Toggle is handled via query param
-    return Results.Ok();
+    engine.SetRunning(false);
+    return Results.Ok(new { running = false });
+});
+
+api.MapPost("/simulation/resume", (SimulationEngine engine) =>
+{
+    engine.SetRunning(true);
+    return Results.Ok(new { running = true });
 });
 
 // SignalR hub

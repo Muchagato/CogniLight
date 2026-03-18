@@ -1,0 +1,83 @@
+.simulation-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #0f172a;
+}
+
+.sim-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+  min-height: 40px;
+}
+
+.sim-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+
+  &.on {
+    background: #22c55e;
+    box-shadow: 0 0 6px #22c55e;
+  }
+}
+
+.sim-time {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 18px;
+  color: #f59e0b;
+  font-weight: 700;
+  min-width: 50px;
+}
+
+.sim-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.ctrl-btn {
+  background: #334155;
+  color: #94a3b8;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #475569;
+    color: #e2e8f0;
+  }
+
+  &.active {
+    background: #f59e0b;
+    color: #0f172a;
+    border-color: #f59e0b;
+    font-weight: 700;
+  }
+}
+
+.selected-pole {
+  margin-left: auto;
+  color: #06b6d4;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sim-canvas {
+  flex: 1;
+  width: 100%;
+  cursor: pointer;
+}
