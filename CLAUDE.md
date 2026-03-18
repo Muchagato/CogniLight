@@ -1,0 +1,245 @@
+# CogniLight — Cognitive Sensing Platform for Smart Lighting Networks
+
+## Project Overview
+
+A full-stack simulation of a smart city lighting network with cognitive sensing capabilities.
+Simulates a city block with ~12 smart light poles, each equipped with virtual sensors.
+Three-layer architecture: animated street simulation, real-time telemetry dashboard, and AI-powered natural language analysis (RAG over telemetry).
+
+**This is a portfolio/interview project for a Full-Stack R&D position at a multinational public lighting company building a cognitive sensing platform for smart cities.**
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│                 Angular Frontend                 │
+│  ┌──────────┐  ┌──────────────┐  ┌───────────┐  │
+│  │ Street   │  │  Telemetry   │  │ AI Chat   │  │
+│  │ Sim View │  │  Dashboard   │  │ (RAG UI)  │  │
+│  └──────────┘  └──────────────┘  └───────────┘  │
+│        ↕ WebSocket       ↕ REST        ↕ REST    │
+├─────────────────────────────────────────────────┤
+│           .NET 10 Backend (C#)                    │
+│  ┌──────────────┐  ┌────────────────────────┐   │
+│  │ Simulation   │  │ Telemetry API          │   │
+│  │ Engine       │  │ (REST + WebSocket)     │   │
+│  │ (time-step)  │  │                        │   │
+│  └──────────────┘  └────────────────────────┘   │
+│        ↕ writes              ↕ reads             │
+│  ┌──────────────────────────────────────────┐   │
+│  │         SQLite (telemetry storage)        │   │
+│  └──────────────────────────────────────────┘   │
+│                      ↕ reads                     │
+├─────────────────────────────────────────────────┤
+│          Python AI Service (FastAPI)             │
+│  ┌──────────────┐  ┌────────────────────────┐   │
+│  │ RAG Pipeline  │  │ Anomaly Detection     │   │
+│  │ (FAISS +     │  │ (rule-based + LLM     │   │
+│  │  embeddings) │  │  summarization)        │   │
+│  └──────────────┘  └────────────────────────┘   │
+└─────────────────────────────────────────────────┘
+```
+
+## Tech Stack (MUST match exactly)
+
+- **Frontend:** Angular 21 with TypeScript, standalone components, Angular Material or custom components
+- **Backend:** C# / .NET 8 minimal API, Entity Framework Core with SQLite, SignalR for WebSocket
+- **AI Service:** Python 3.11+, FastAPI, sentence-transformers for embeddings, FAISS for vector search
+- **LLM:** Use OpenAI-compatible API (user will configure key) OR mock responses for demo mode
+- **Containerization:** Docker Compose to run all three services
+
+## Directory Structure
+
+```
+cognilight/
+├── docker-compose.yml
+├── README.md
+├── frontend/                    # Angular app
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── simulation/      # Street view component (HTML5 Canvas)
+│   │   │   ├── dashboard/       # Telemetry dashboard component
+│   │   │   ├── chat/            # AI chat component
+│   │   │   ├── shared/          # Shared models, services
+│   │   │   └── app.component.ts
+│   │   └── ...
+│   ├── angular.json
+│   └── Dockerfile
+├── backend/                     # .NET 10 API
+│   ├── CogniLight.Api/
+│   │   ├── Program.cs
+│   │   ├── Models/
+│   │   ├── Services/
+│   │   │   ├── SimulationEngine.cs
+│   │   │   └── TelemetryService.cs
+│   │   ├── Hubs/
+│   │   │   └── TelemetryHub.cs  # SignalR hub
+│   │   ├── Controllers/
+│   │   └── Data/
+│   │       └── AppDbContext.cs
+│   ├── CogniLight.Api.csproj
+│   └── Dockerfile
+├── ai-service/                  # Python FastAPI
+│   ├── main.py
+│   ├── rag/
+│   │   ├── embeddings.py
+│   │   ├── retriever.py
+│   │   └── chain.py
+│   ├── anomaly/
+│   │   └── detector.py
+│   ├── requirements.txt
+│   └── Dockerfile
+└── docs/
+    └── architecture.md
+```
+
+## Simulation Design
+
+### The Street Scene
+- Top-down 2D view of a city block rendered on HTML5 Canvas
+- ~12 light poles positioned along two parallel streets with an intersection
+- Each pole has a visible sensor radius (circle overlay, semi-transparent)
+- Moving entities: pedestrians (small dots/icons), cars (rectangles), cyclists (smaller rectangles)
+- Time-of-day cycle: sky color shifts, lighting cones appear at night, entity density varies
+- Time controls: play/pause, speed multiplier (1x, 2x, 5x, 10x), time-of-day display
+
+### Entity Behavior
+- Pedestrians: random walks on sidewalks, clustering near buildings, reduced at night
+- Vehicles: follow road lanes, stop at intersection, density follows rush-hour patterns
+- Cyclists: bike lane movement, moderate speed between pedestrians and cars
+
+### Per-Pole Telemetry (generated each simulation tick, ~1 second):
+- `pole_id` (string): "POLE-01" through "POLE-12"
+- `timestamp` (ISO 8601)
+- `energy_watts` (float): power consumption, 50-250W range, adaptive dimming at night
+- `pedestrian_count` (int): entities within sensor radius
+- `vehicle_count` (int): vehicles within sensor radius
+- `cyclist_count` (int): cyclists within sensor radius
+- `ambient_light_lux` (float): 0-100000, follows time-of-day curve
+- `temperature_c` (float): 15-35°C with daily cycle
+- `humidity_pct` (float): 40-80%
+- `air_quality_aqi` (int): 20-150, spikes with traffic density
+- `noise_db` (float): 30-85, correlates with traffic
+- `light_level_pct` (float): 0-100%, adaptive dimming output
+- `anomaly_flag` (bool): occasional random anomalies (flickering, sensor malfunction)
+
+### Anomaly Scenarios (randomly injected):
+- Unusual pedestrian cluster at odd hours (potential safety event)
+- Sudden energy spike on a pole (malfunction)
+- Sensor dropout (null readings)
+- Air quality spike uncorrelated with traffic (external event)
+
+## Dashboard Design
+
+### Layout
+Full-width below the street simulation. Use a grid of cards/panels:
+
+**Row 1 — Aggregate KPIs:**
+- Total energy consumption (all poles, real-time)
+- Total pedestrian count across network
+- Total vehicle count
+- Average air quality index
+- Active anomalies count (with alert badge)
+
+**Row 2 — Time-Series Charts:**
+- Energy consumption over time (line chart, stacked by pole or aggregated)
+- Traffic density over time (pedestrians + vehicles + cyclists, area chart)
+- Environmental conditions (temperature, humidity, AQI — multi-axis line chart)
+
+**Row 3 — Per-Pole Detail:**
+- Selectable pole table/grid showing current readings
+- Click a pole on the street view OR in the table to see its individual charts
+- Anomaly log: timestamped list of detected anomalies with severity
+
+### Chart Library
+Use a well-supported Angular charting library: ngx-charts, Chart.js with ng2-charts, or Apache ECharts with ngx-echarts. Prefer ECharts for its real-time streaming capability.
+
+## AI Chat Panel
+
+### UI
+- Collapsible side panel or bottom drawer
+- Chat message interface with user/assistant bubbles
+- Suggested prompts: "Summarize the last hour", "Which poles are consuming the most energy?", "Any anomalies detected?", "Compare traffic between morning and evening"
+
+### RAG Pipeline
+1. Telemetry data is periodically summarized into text chunks (e.g., every 5 minutes of simulation time)
+   - Example chunk: "Between 14:00-14:05, POLE-03 recorded 45 pedestrians, 12 vehicles, energy at 180W. AQI spiked to 95. Anomaly: unusual pedestrian cluster detected."
+2. Chunks are embedded using sentence-transformers (all-MiniLM-L6-v2)
+3. Stored in FAISS index
+4. On user query: embed query → retrieve top-k chunks → format prompt with context → send to LLM
+5. LLM generates natural language answer grounded in telemetry data
+
+### Demo Mode (no API key)
+- If no LLM API key is configured, use pre-canned responses that demonstrate the interface
+- Alternatively, use a small local model or rule-based response generation
+
+## Visual Design Direction
+
+**Aesthetic: Industrial/utilitarian meets data-rich dashboard — think control room UI.**
+- Dark theme (charcoal/navy background, NOT pure black)
+- Accent color: warm amber/orange (#F59E0B) — evokes street lighting
+- Secondary accent: cool teal (#06B6D4) — for data/digital elements
+- Monospace font for data values, clean sans-serif for labels
+- Subtle grid lines, no heavy borders
+- Glow effects on active poles in the street view
+- Status indicators: green (normal), amber (warning), red (anomaly)
+
+## Development Phases
+
+### Phase 1: Project Scaffolding & Simulation Engine
+1. Set up Angular project with routing (3 main views or single-page sections)
+2. Set up .NET 10 minimal API project with SQLite + EF Core
+3. Set up Python FastAPI project with placeholder endpoints
+4. Docker Compose for all three + volume for SQLite
+5. Implement SimulationEngine in C# — time-step loop generating telemetry data
+6. Store telemetry in SQLite via EF Core
+7. SignalR hub broadcasting latest telemetry each tick
+
+### Phase 2: Street Simulation View
+1. Angular component with HTML5 Canvas
+2. Render street layout (roads, sidewalks, buildings as rectangles, pole positions)
+3. Animate entities (pedestrians, vehicles, cyclists) with basic movement patterns
+4. Pole sensor radius visualization
+5. Time-of-day lighting effects
+6. Connect to SignalR to receive simulation state updates
+7. Click-to-select pole interaction
+
+### Phase 3: Telemetry Dashboard
+1. KPI summary cards with real-time values from SignalR
+2. Time-series charts (ECharts) updating in real-time
+3. Per-pole detail view (click pole → see its charts)
+4. Anomaly log panel
+5. Responsive grid layout
+
+### Phase 4: AI Service & Chat
+1. Python service reads from SQLite, generates text summaries
+2. Embedding + FAISS indexing of summaries
+3. RAG retrieval endpoint
+4. Chat UI in Angular
+5. Demo mode fallback
+
+### Phase 5: Polish & Documentation
+1. Loading states, error handling, empty states
+2. README with screenshots, architecture diagram, setup instructions
+3. Smooth animations and transitions
+4. Code cleanup, comments on key decisions
+
+## Key Implementation Notes
+
+- The simulation engine should run as a hosted background service in .NET (IHostedService)
+- Use SignalR for real-time telemetry push — NOT polling
+- The Angular app should use RxJS extensively for reactive data streams
+- Keep the SQLite database small — consider purging data older than N simulation-hours
+- The Python service connects to the SAME SQLite file (read-only) or queries the .NET API
+- All API communication between services uses JSON
+- For the canvas rendering, use requestAnimationFrame and keep the entity state synchronized with the backend simulation state
+
+## Quality Standards
+- TypeScript strict mode in Angular
+- Proper C# nullable reference types
+- Python type hints throughout
+- Error handling on all API calls
+- No hardcoded values — use configuration/environment variables
+- Clean git commit messages following conventional commits

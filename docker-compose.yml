@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "4200:4200"
+    depends_on:
+      - backend
+
+  backend:
+    build: ./backend/CogniLight.Api
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__Default=Data Source=/data/cognilight.db
+    volumes:
+      - db-data:/data
+
+  ai-service:
+    build: ./ai-service
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_PATH=/data/cognilight.db
+      - LLM_API_KEY=${LLM_API_KEY:-}
+    volumes:
+      - db-data:/data
+
+volumes:
+  db-data:
