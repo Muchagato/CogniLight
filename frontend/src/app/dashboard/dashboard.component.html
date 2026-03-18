@@ -1,0 +1,113 @@
+<div class="dashboard">
+  <!-- KPI Row -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <span class="kpi-label">Total Energy</span>
+      <span class="kpi-value energy">{{ totalEnergy | number }} W</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">Pedestrians</span>
+      <span class="kpi-value pedestrian">{{ totalPedestrians }}</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">Vehicles</span>
+      <span class="kpi-value vehicle">{{ totalVehicles }}</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">Avg AQI</span>
+      <span class="kpi-value" [ngClass]="aqiClass(avgAqi)">{{ avgAqi }}</span>
+    </div>
+    <div class="kpi-card" [class.alert]="activeAnomalies > 0">
+      <span class="kpi-label">Anomalies</span>
+      <span class="kpi-value anomaly">{{ activeAnomalies }}</span>
+    </div>
+  </div>
+
+  <!-- Charts Row -->
+  <div class="charts-row">
+    <div class="chart-panel">
+      <h3>Energy Consumption</h3>
+      <div echarts [options]="energyChartOpts" class="chart"></div>
+    </div>
+    <div class="chart-panel">
+      <h3>Traffic Density</h3>
+      <div echarts [options]="trafficChartOpts" class="chart"></div>
+    </div>
+    <div class="chart-panel">
+      <h3>Environmental</h3>
+      <div echarts [options]="envChartOpts" class="chart"></div>
+    </div>
+  </div>
+
+  <!-- Per-Pole Detail + Anomaly Log -->
+  <div class="detail-row">
+    <div class="pole-table-panel">
+      <h3>Per-Pole Readings</h3>
+      <div class="pole-table-scroll">
+        <table class="pole-table">
+          <thead>
+            <tr>
+              <th>Pole</th>
+              <th>Energy</th>
+              <th>Ped</th>
+              <th>Veh</th>
+              <th>Light</th>
+              <th>AQI</th>
+              <th>Noise</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of readings; track r.poleId) {
+              <tr [class.selected]="selectedPoleId === r.poleId"
+                  [class.anomaly-row]="r.anomalyFlag"
+                  (click)="selectPole(r.poleId)">
+                <td class="pole-id">{{ r.poleId }}</td>
+                <td>{{ r.energyWatts | number:'1.0-0' }}</td>
+                <td>{{ r.pedestrianCount }}</td>
+                <td>{{ r.vehicleCount }}</td>
+                <td>{{ r.lightLevelPct | number:'1.0-0' }}%</td>
+                <td>{{ r.airQualityAqi }}</td>
+                <td>{{ r.noiseDb | number:'1.0-0' }}</td>
+                <td>
+                  @if (r.anomalyFlag) {
+                    <span class="status-badge red">ALERT</span>
+                  } @else {
+                    <span class="status-badge green">OK</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="side-panels">
+      <!-- Pole detail chart -->
+      @if (selectedPoleId) {
+        <div class="chart-panel small">
+          <h3>{{ selectedPoleId }} Detail</h3>
+          <div echarts [options]="poleChartOpts" class="chart"></div>
+        </div>
+      }
+
+      <!-- Anomaly Log -->
+      <div class="anomaly-log-panel">
+        <h3>Anomaly Log</h3>
+        <div class="anomaly-list">
+          @for (a of anomalies; track $index) {
+            <div class="anomaly-entry">
+              <span class="anomaly-time">{{ formatTime(a.time) }}</span>
+              <span class="anomaly-pole">{{ a.poleId }}</span>
+              <span class="anomaly-desc">{{ a.description }}</span>
+            </div>
+          }
+          @if (anomalies.length === 0) {
+            <div class="empty-state">No anomalies detected yet.</div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

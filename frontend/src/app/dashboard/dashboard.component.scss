@@ -1,0 +1,233 @@
+.dashboard {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+// --- KPI Row ---
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.kpi-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  &.alert {
+    border-color: #ef4444;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.2);
+  }
+}
+
+.kpi-label {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kpi-value {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+
+  &.energy { color: #f59e0b; }
+  &.pedestrian { color: #06b6d4; }
+  &.vehicle { color: #fbbf24; }
+  &.good { color: #22c55e; }
+  &.moderate { color: #f59e0b; }
+  &.unhealthy { color: #ef4444; }
+  &.anomaly { color: #ef4444; }
+}
+
+// --- Charts Row ---
+.charts-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.chart-panel {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 12px;
+
+  h3 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: #94a3b8;
+    font-weight: 600;
+  }
+
+  &.small {
+    .chart {
+      height: 200px;
+    }
+  }
+}
+
+.chart {
+  width: 100%;
+  height: 200px;
+}
+
+// --- Detail Row ---
+.detail-row {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 12px;
+}
+
+.pole-table-panel {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 12px;
+
+  h3 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: #94a3b8;
+    font-weight: 600;
+  }
+}
+
+.pole-table-scroll {
+  overflow-x: auto;
+}
+
+.pole-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+
+  th {
+    text-align: left;
+    padding: 6px 8px;
+    color: #64748b;
+    font-weight: 600;
+    border-bottom: 1px solid #334155;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+
+  td {
+    padding: 6px 8px;
+    color: #e2e8f0;
+    font-family: monospace;
+    border-bottom: 1px solid #1e293b;
+  }
+
+  tr {
+    cursor: pointer;
+    transition: background 0.15s;
+
+    &:hover { background: #334155; }
+    &.selected { background: rgba(6, 182, 212, 0.1); }
+    &.anomaly-row td { color: #fca5a5; }
+  }
+
+  .pole-id {
+    color: #06b6d4;
+    font-weight: 600;
+  }
+}
+
+.status-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+
+  &.green {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+  }
+
+  &.red {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+  }
+}
+
+// --- Side panels ---
+.side-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.anomaly-log-panel {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 12px;
+  flex: 1;
+  min-height: 0;
+
+  h3 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: #94a3b8;
+    font-weight: 600;
+  }
+}
+
+.anomaly-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.anomaly-entry {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid #0f172a;
+  font-size: 12px;
+  align-items: baseline;
+}
+
+.anomaly-time {
+  color: #64748b;
+  font-family: monospace;
+  flex-shrink: 0;
+}
+
+.anomaly-pole {
+  color: #06b6d4;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.anomaly-desc {
+  color: #fca5a5;
+}
+
+.empty-state {
+  color: #475569;
+  font-size: 13px;
+  padding: 16px 0;
+  text-align: center;
+}
+
+// Responsive
+@media (max-width: 1200px) {
+  .kpi-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .charts-row {
+    grid-template-columns: 1fr;
+  }
+  .detail-row {
+    grid-template-columns: 1fr;
+  }
+}

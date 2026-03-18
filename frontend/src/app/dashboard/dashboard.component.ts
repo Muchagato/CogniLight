@@ -1,101 +1,200 @@
-import { Component, inject } from '@angular/core';
-import { AsyncPipe, DecimalPipe } from '@angular/common';
-import { TelemetryService } from '../shared/services/telemetry.service';
+import { Component, inject, OnDestroy } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Subject, takeUntil } from 'rxjs';
+import { NgxEchartsDirective } from 'ngx-echarts';
+import type { EChartsOption } from 'echarts';
+import {
+  TelemetryService,
+  AggregateSnapshot,
+  AnomalyEvent,
+} from '../shared/services/telemetry.service';
+import { TelemetryReading } from '../shared/models/telemetry.model';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [AsyncPipe, DecimalPipe],
-  template: `
-    <div class="dashboard">
-      <h2>Telemetry Dashboard</h2>
-      <div class="status-bar">
-        <span class="sim-time">Simulation Time: {{ (telemetry.simulationTime$ | async) || 'Waiting...' }}</span>
-        <span class="connection" [class.connected]="telemetry.connected$ | async">
-          {{ (telemetry.connected$ | async) ? 'Connected' : 'Disconnected' }}
-        </span>
-      </div>
-      <div class="readings-grid">
-        @for (reading of telemetry.readings$ | async; track reading.poleId) {
-          <div class="pole-card" [class.anomaly]="reading.anomalyFlag">
-            <h3>{{ reading.poleId }}</h3>
-            <div class="metric"><span>Energy</span><span>{{ reading.energyWatts | number:'1.0-1' }} W</span></div>
-            <div class="metric"><span>Pedestrians</span><span>{{ reading.pedestrianCount }}</span></div>
-            <div class="metric"><span>Vehicles</span><span>{{ reading.vehicleCount }}</span></div>
-            <div class="metric"><span>Light</span><span>{{ reading.lightLevelPct | number:'1.0-0' }}%</span></div>
-            <div class="metric"><span>AQI</span><span>{{ reading.airQualityAqi }}</span></div>
-            @if (reading.anomalyFlag) {
-              <div class="anomaly-badge">ANOMALY</div>
-            }
-          </div>
-        }
-      </div>
-    </div>
-  `,
-  styles: [`
-    .dashboard {
-      padding: 16px;
-      color: #e2e8f0;
-    }
-    h2 { color: #f59e0b; margin-bottom: 12px; }
-    .status-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 12px;
-      background: #1e293b;
-      border-radius: 6px;
-      margin-bottom: 16px;
-      font-size: 14px;
-    }
-    .connection {
-      color: #ef4444;
-      font-weight: 600;
-    }
-    .connection.connected { color: #22c55e; }
-    .readings-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 12px;
-    }
-    .pole-card {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      padding: 12px;
-    }
-    .pole-card.anomaly {
-      border-color: #ef4444;
-      box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
-    }
-    .pole-card h3 {
-      color: #06b6d4;
-      margin: 0 0 8px;
-      font-size: 14px;
-    }
-    .metric {
-      display: flex;
-      justify-content: space-between;
-      font-size: 13px;
-      padding: 2px 0;
-      color: #94a3b8;
-    }
-    .metric span:last-child {
-      color: #e2e8f0;
-      font-family: monospace;
-    }
-    .anomaly-badge {
-      margin-top: 6px;
-      padding: 2px 8px;
-      background: #ef4444;
-      color: white;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 700;
-      text-align: center;
-    }
-  `]
+  imports: [CommonModule, NgxEchartsDirective],
+  templateUrl: './dashboard.component.html',
+  styleUrl: './dashboard.component.scss',
 })
-export class DashboardComponent {
-  protected readonly telemetry = inject(TelemetryService);
+export class DashboardComponent implements OnDestroy {
+  private readonly telemetry = inject(TelemetryService);
+  private readonly destroy$ = new Subject<void>();
+
+  readings: TelemetryReading[] = [];
+  simulationTime = '';
+  connected = false;
+  anomalies: AnomalyEvent[] = [];
+  selectedPoleId: string | null = null;
+
+  // KPI values
+  totalEnergy = 0;
+  totalPedestrians = 0;
+  totalVehicles = 0;
+  avgAqi = 0;
+  activeAnomalies = 0;
+
+  // Chart options
+  energyChartOpts: EChartsOption = {};
+  trafficChartOpts: EChartsOption = {};
+  envChartOpts: EChartsOption = {};
+  poleChartOpts: EChartsOption = {};
+
+  private history: AggregateSnapshot[] = [];
+
+  constructor() {
+    this.telemetry.readings$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(r => {
+        this.readings = r;
+        this.updateKpis(r);
+      });
+
+    this.telemetry.simulationTime$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(t => this.simulationTime = t);
+
+    this.telemetry.connected$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(c => this.connected = c);
+
+    this.telemetry.history$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(h => {
+        this.history = h;
+        this.updateCharts();
+      });
+
+    this.telemetry.anomalies$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(a => this.anomalies = a);
+  }
+
+  private updateKpis(r: TelemetryReading[]): void {
+    this.totalEnergy = Math.round(r.reduce((s, x) => s + x.energyWatts, 0));
+    this.totalPedestrians = r.reduce((s, x) => s + x.pedestrianCount, 0);
+    this.totalVehicles = r.reduce((s, x) => s + x.vehicleCount, 0);
+    this.avgAqi = r.length ? Math.round(r.reduce((s, x) => s + x.airQualityAqi, 0) / r.length) : 0;
+    this.activeAnomalies = r.filter(x => x.anomalyFlag).length;
+  }
+
+  selectPole(poleId: string): void {
+    this.selectedPoleId = this.selectedPoleId === poleId ? null : poleId;
+    this.updatePoleChart();
+  }
+
+  formatTime(iso: string): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toISOString().substring(11, 16);
+  }
+
+  aqiClass(aqi: number): string {
+    if (aqi <= 50) return 'good';
+    if (aqi <= 100) return 'moderate';
+    return 'unhealthy';
+  }
+
+  private chartTheme = {
+    textColor: '#94a3b8',
+    gridBg: 'transparent',
+    lineColors: ['#f59e0b', '#06b6d4', '#a78bfa', '#22c55e', '#ef4444'],
+  };
+
+  private updateCharts(): void {
+    if (this.history.length < 2) return;
+    const times = this.history.map(h => this.formatTime(h.time));
+
+    this.energyChartOpts = {
+      animation: false,
+      grid: { top: 30, right: 16, bottom: 24, left: 50 },
+      tooltip: { trigger: 'axis', backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#e2e8f0' } },
+      xAxis: { type: 'category', data: times, axisLabel: { color: '#64748b', fontSize: 10 }, axisLine: { lineStyle: { color: '#334155' } } },
+      yAxis: { type: 'value', name: 'Watts', nameTextStyle: { color: '#64748b' }, axisLabel: { color: '#64748b', fontSize: 10 }, splitLine: { lineStyle: { color: '#1e293b' } } },
+      series: [{
+        type: 'line',
+        data: this.history.map(h => Math.round(h.totalEnergy)),
+        smooth: true,
+        symbol: 'none',
+        lineStyle: { color: '#f59e0b', width: 2 },
+        areaStyle: { color: 'rgba(245,158,11,0.1)' },
+      }],
+    };
+
+    this.trafficChartOpts = {
+      animation: false,
+      grid: { top: 30, right: 16, bottom: 24, left: 50 },
+      tooltip: { trigger: 'axis', backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#e2e8f0' } },
+      legend: { data: ['Pedestrians', 'Vehicles', 'Cyclists'], textStyle: { color: '#94a3b8', fontSize: 10 }, top: 0 },
+      xAxis: { type: 'category', data: times, axisLabel: { color: '#64748b', fontSize: 10 }, axisLine: { lineStyle: { color: '#334155' } } },
+      yAxis: { type: 'value', axisLabel: { color: '#64748b', fontSize: 10 }, splitLine: { lineStyle: { color: '#1e293b' } } },
+      series: [
+        { name: 'Pedestrians', type: 'line', stack: 'traffic', data: this.history.map(h => h.totalPedestrians), smooth: true, symbol: 'none', areaStyle: { opacity: 0.3 }, lineStyle: { color: '#06b6d4' }, itemStyle: { color: '#06b6d4' } },
+        { name: 'Vehicles', type: 'line', stack: 'traffic', data: this.history.map(h => h.totalVehicles), smooth: true, symbol: 'none', areaStyle: { opacity: 0.3 }, lineStyle: { color: '#f59e0b' }, itemStyle: { color: '#f59e0b' } },
+        { name: 'Cyclists', type: 'line', stack: 'traffic', data: this.history.map(h => h.totalCyclists), smooth: true, symbol: 'none', areaStyle: { opacity: 0.3 }, lineStyle: { color: '#a78bfa' }, itemStyle: { color: '#a78bfa' } },
+      ],
+    };
+
+    this.envChartOpts = {
+      animation: false,
+      grid: { top: 30, right: 60, bottom: 24, left: 50 },
+      tooltip: { trigger: 'axis', backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#e2e8f0' } },
+      legend: { data: ['Temp', 'Humidity', 'AQI'], textStyle: { color: '#94a3b8', fontSize: 10 }, top: 0 },
+      xAxis: { type: 'category', data: times, axisLabel: { color: '#64748b', fontSize: 10 }, axisLine: { lineStyle: { color: '#334155' } } },
+      yAxis: [
+        { type: 'value', name: 'Temp/Humid', axisLabel: { color: '#64748b', fontSize: 10 }, splitLine: { lineStyle: { color: '#1e293b' } }, nameTextStyle: { color: '#64748b' } },
+        { type: 'value', name: 'AQI', axisLabel: { color: '#64748b', fontSize: 10 }, splitLine: { show: false }, nameTextStyle: { color: '#64748b' } },
+      ],
+      series: [
+        { name: 'Temp', type: 'line', data: this.history.map(h => h.avgTemperature), smooth: true, symbol: 'none', lineStyle: { color: '#ef4444' }, itemStyle: { color: '#ef4444' } },
+        { name: 'Humidity', type: 'line', data: this.history.map(h => h.avgHumidity), smooth: true, symbol: 'none', lineStyle: { color: '#3b82f6' }, itemStyle: { color: '#3b82f6' } },
+        { name: 'AQI', type: 'line', yAxisIndex: 1, data: this.history.map(h => h.avgAqi), smooth: true, symbol: 'none', lineStyle: { color: '#22c55e' }, itemStyle: { color: '#22c55e' } },
+      ],
+    };
+
+    this.updatePoleChart();
+  }
+
+  private updatePoleChart(): void {
+    if (!this.selectedPoleId || this.history.length < 2) {
+      this.poleChartOpts = {};
+      return;
+    }
+
+    // For per-pole chart, use latest readings only (we don't store per-pole history in frontend)
+    const pole = this.readings.find(r => r.poleId === this.selectedPoleId);
+    if (!pole) return;
+
+    const metrics = ['Energy', 'Light%', 'AQI', 'Noise', 'Temp'];
+    const values = [
+      pole.energyWatts,
+      pole.lightLevelPct,
+      pole.airQualityAqi,
+      pole.noiseDb,
+      pole.temperatureC,
+    ];
+
+    this.poleChartOpts = {
+      animation: false,
+      radar: {
+        indicator: metrics.map(m => ({ name: m, max: m === 'Energy' ? 250 : m === 'AQI' ? 150 : 100 })),
+        axisName: { color: '#94a3b8' },
+        splitArea: { areaStyle: { color: ['#1e293b', '#0f172a'] } },
+        splitLine: { lineStyle: { color: '#334155' } },
+        axisLine: { lineStyle: { color: '#334155' } },
+      },
+      series: [{
+        type: 'radar',
+        data: [{ value: values, name: this.selectedPoleId }],
+        lineStyle: { color: '#06b6d4' },
+        areaStyle: { color: 'rgba(6,182,212,0.15)' },
+        itemStyle: { color: '#06b6d4' },
+      }],
+    };
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
 }
