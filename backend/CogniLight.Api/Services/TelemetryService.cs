@@ -120,8 +120,8 @@ public class TelemetryService
             """;
 
         cmd.Parameters.Add(new SqliteParameter("@bucket", bucketSeconds));
-        cmd.Parameters.Add(new SqliteParameter("@from", from.ToString("o")));
-        cmd.Parameters.Add(new SqliteParameter("@to", to.ToString("o")));
+        cmd.Parameters.Add(new SqliteParameter("@from", from.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFF")));
+        cmd.Parameters.Add(new SqliteParameter("@to", to.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFF")));
 
         var results = new List<AggregatedBucket>();
         using var reader = await cmd.ExecuteReaderAsync();
@@ -175,8 +175,8 @@ public class TelemetryService
 
         cmd.Parameters.Add(new SqliteParameter("@bucket", bucketSeconds));
         cmd.Parameters.Add(new SqliteParameter("@poleId", poleId));
-        cmd.Parameters.Add(new SqliteParameter("@from", from.ToString("o")));
-        cmd.Parameters.Add(new SqliteParameter("@to", to.ToString("o")));
+        cmd.Parameters.Add(new SqliteParameter("@from", from.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFF")));
+        cmd.Parameters.Add(new SqliteParameter("@to", to.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFF")));
 
         var results = new List<PoleBucket>();
         using var reader = await cmd.ExecuteReaderAsync();

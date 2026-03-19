@@ -1,3 +1,4 @@
+using CogniLight.Api;
 using CogniLight.Api.Data;
 using CogniLight.Api.Hubs;
 using CogniLight.Api.Services;
@@ -111,5 +112,11 @@ api.MapPost("/simulation/resume", (SimulationEngine engine) =>
 
 // SignalR hub
 app.MapHub<TelemetryHub>("/hubs/telemetry");
+
+// Diagnostic endpoints (dev only)
+if (app.Environment.IsDevelopment())
+{
+    app.MapDiagnosticEndpoints();
+}
 
 app.Run();
