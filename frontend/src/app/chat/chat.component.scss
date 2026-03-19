@@ -36,6 +36,28 @@
   color: var(--cl-text-faint);
 }
 
+.chat-expand {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--cl-border);
+  color: var(--cl-text-faint);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+
+  &:hover {
+    background: var(--cl-bg-hover);
+    color: var(--cl-text-primary);
+    border-color: var(--cl-text-faint);
+  }
+}
+
 .chat-close {
   margin-left: auto;
   background: none;
@@ -137,6 +159,7 @@
     background: var(--cl-bg-hover);
     border: 1px solid var(--cl-border);
     color: var(--cl-text-primary);
+    min-width: 200px;
   }
 }
 
@@ -153,33 +176,260 @@
 
 .msg-content {
   color: var(--cl-text-secondary);
-  white-space: pre-wrap;
   word-break: break-word;
 
-  &.typing {
-    color: var(--cl-text-faint);
-    font-style: italic;
+  .user & {
+    white-space: pre-wrap;
   }
 }
 
-.sources {
-  margin-top: 6px;
+// ---------------------------------------------------------------------------
+// Streaming indicators
+// ---------------------------------------------------------------------------
 
-  summary {
-    font-size: 10px;
-    color: var(--cl-text-faint);
-    cursor: pointer;
-    user-select: none;
-  }
-}
-
-.source-item {
-  font-size: 10px;
+.typing-indicator {
   color: var(--cl-text-faint);
-  padding: 3px 0;
-  border-bottom: 1px solid var(--cl-border-subtle);
-  line-height: 1.3;
+  font-style: italic;
+  font-size: 12px;
 }
+
+.dots::after {
+  content: '...';
+  display: inline-block;
+  width: 1.5ch;
+  text-align: left;
+  animation: dots 1.4s steps(4, end) infinite;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+
+@keyframes dots {
+  0%   { width: 0; }
+  25%  { width: 0.5ch; }
+  50%  { width: 1ch; }
+  75%  { width: 1.5ch; }
+  100% { width: 0; }
+}
+
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--cl-amber);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 0.7s step-end infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+// ---------------------------------------------------------------------------
+// Markdown body
+// ---------------------------------------------------------------------------
+
+.markdown-body {
+  color: var(--cl-text-secondary);
+
+  // Reset margins for first/last children
+  > :first-child { margin-top: 0; }
+  > :last-child { margin-bottom: 0; }
+
+  p {
+    margin: 0.4em 0;
+  }
+
+  strong {
+    color: var(--cl-text-primary);
+    font-weight: 600;
+  }
+
+  em {
+    color: var(--cl-text-muted);
+  }
+
+  ul, ol {
+    margin: 0.4em 0;
+    padding-left: 1.4em;
+  }
+
+  li {
+    margin: 0.2em 0;
+  }
+
+  code {
+    background: var(--cl-bg-inset);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.88em;
+    color: var(--cl-cyan);
+  }
+
+  pre {
+    background: var(--cl-bg-inset);
+    padding: 10px 12px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 0.5em 0;
+    border: 1px solid var(--cl-border-subtle);
+
+    code {
+      background: none;
+      padding: 0;
+      color: var(--cl-text-secondary);
+    }
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.5em 0;
+    font-size: 11px;
+
+    th, td {
+      border: 1px solid var(--cl-border);
+      padding: 5px 8px;
+      text-align: left;
+    }
+
+    th {
+      background: var(--cl-bg-inset);
+      color: var(--cl-amber);
+      font-weight: 600;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    tr:hover td {
+      background: var(--cl-bg-active);
+    }
+  }
+
+  blockquote {
+    border-left: 3px solid var(--cl-amber);
+    padding-left: 10px;
+    margin: 0.5em 0;
+    color: var(--cl-text-muted);
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--cl-border);
+    margin: 0.6em 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sources
+// ---------------------------------------------------------------------------
+
+.sources-section {
+  margin-top: 10px;
+  border-top: 1px solid var(--cl-border-subtle);
+  padding-top: 8px;
+}
+
+.sources-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--cl-text-faint);
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+  font-family: inherit;
+
+  &:hover {
+    color: var(--cl-text-muted);
+  }
+}
+
+.sources-icon {
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.sources-chevron {
+  margin-left: auto;
+  transition: transform 0.2s ease;
+  opacity: 0.5;
+
+  &.open {
+    transform: rotate(90deg);
+  }
+}
+
+.sources-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.source-card {
+  background: var(--cl-bg-inset);
+  border: 1px solid var(--cl-border-subtle);
+  border-radius: 8px;
+  padding: 8px 10px;
+  transition: border-color 0.15s;
+
+  &:hover {
+    border-color: var(--cl-border);
+  }
+}
+
+.source-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  gap: 8px;
+}
+
+.source-time {
+  color: var(--cl-cyan);
+  font-weight: 600;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.source-poles {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.pole-tag {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--cl-amber-light);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.source-card-body {
+  color: var(--cl-text-faint);
+  font-size: 11px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+// ---------------------------------------------------------------------------
+// Input area
+// ---------------------------------------------------------------------------
 
 .input-area {
   display: flex;
@@ -218,9 +468,12 @@
   color: #000000;
   border: none;
   border-radius: 8px;
-  padding: 8px 16px;
-  font-weight: 600;
-  font-size: 13px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   cursor: pointer;
   transition: all 0.15s;
 

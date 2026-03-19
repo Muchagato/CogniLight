@@ -1,11 +1,13 @@
 <nav class="top-nav">
   <span class="brand">CogniLight</span>
   <div class="nav-spacer"></div>
-  <button class="chat-toggle" [class.active]="layout.chatOpen()" (click)="layout.toggleChat()">
-    <span class="chat-toggle-icon">&#x1F4AC;</span>
-    {{ layout.chatOpen() ? 'Hide AI' : 'Show AI' }}
+  <button class="chat-toggle" [class.active]="layout.chatOpen()" (click)="layout.toggleChat()" title="AI Assistant">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+    </svg>
   </button>
 </nav>
 <main>
   <router-outlet />
 </main>
+

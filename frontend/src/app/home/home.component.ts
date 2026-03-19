@@ -11,19 +11,21 @@ import { LayoutService } from '../shared/services/layout.service';
   imports: [CommonModule, SimulationComponent, DashboardComponent, ChatComponent],
   template: `
     <div class="home-layout">
-      <section class="sim-section" [class.collapsed]="layout.simCollapsed()">
-        <app-simulation />
-      </section>
-      <div class="divider" (click)="layout.toggleSim()" [title]="layout.simCollapsed() ? 'Show map' : 'Hide map'">
-        <div class="divider-toggle">
-          <span class="divider-arrow" [class.collapsed]="layout.simCollapsed()">&#9666;</span>
+      @if (!layout.chatFullscreen()) {
+        <section class="sim-section" [class.collapsed]="layout.simCollapsed()">
+          <app-simulation />
+        </section>
+        <div class="divider" (click)="layout.toggleSim()" [title]="layout.simCollapsed() ? 'Show map' : 'Hide map'">
+          <div class="divider-toggle">
+            <span class="divider-arrow" [class.collapsed]="layout.simCollapsed()">&#9666;</span>
+          </div>
         </div>
-      </div>
-      <section class="dash-section">
-        <app-dashboard />
-      </section>
+        <section class="dash-section">
+          <app-dashboard />
+        </section>
+      }
       @if (layout.chatOpen()) {
-        <section class="chat-section">
+        <section class="chat-section" [class.fullscreen]="layout.chatFullscreen()">
           <app-chat />
         </section>
       }
@@ -111,6 +113,13 @@ import { LayoutService } from '../shared/services/layout.service';
       flex-direction: column;
       background: var(--cl-bg-raised);
       overflow: hidden;
+
+      &.fullscreen {
+        flex: 1;
+        width: auto;
+        min-width: 0;
+        border-left: none;
+      }
     }
   `],
 })
