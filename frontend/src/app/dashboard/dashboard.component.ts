@@ -439,20 +439,34 @@ export class DashboardComponent implements OnDestroy {
     return `${m}/${day} ${t}`;
   }
 
-  private getTimeFormatter(): (iso: string) => string {
+  /** Returns an ECharts axisLabel.formatter string pattern for the active time range. */
+  private getTimeAxisFormat(): string {
     const range = TIME_RANGES.find(r => r.key === this.activeRange);
-    if (!range || range.duration <= 3600) {
-      return (iso: string) => new Date(iso).toISOString().substring(11, 19);
+    if (!range || range.duration <= 3600) return '{HH}:{mm}:{ss}';
+    if (range.duration <= 86400) return '{HH}:{mm}';
+    return '{MM}/{dd} {HH}:{mm}';
+  }
+
+  /** Zip timestamps with values into [timestamp, value] pairs for ECharts time axis.
+   *  Inserts null break points when consecutive timestamps exceed the expected interval,
+   *  so ECharts doesn't draw a connecting line across data gaps. */
+  private timePair(times: string[], values: number[]): [string, number | null][] {
+    const range = TIME_RANGES.find(r => r.key === this.activeRange);
+    // Gap threshold: 3x the bucket size (or 3s for live mode)
+    const bucketMs = ((range?.bucket || 1) * 3) * 1000;
+    const result: [string, number | null][] = [];
+    for (let i = 0; i < times.length; i++) {
+      if (i > 0) {
+        const prev = new Date(times[i - 1]).getTime();
+        const curr = new Date(times[i]).getTime();
+        if (curr - prev > bucketMs) {
+          // Insert a null point just after the last valid point to break the line
+          result.push([new Date(prev + 1).toISOString(), null]);
+        }
+      }
+      result.push([times[i], values[i]]);
     }
-    if (range.duration <= 86400) {
-      return (iso: string) => new Date(iso).toISOString().substring(11, 16);
-    }
-    return (iso: string) => {
-      const d = new Date(iso);
-      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(d.getUTCDate()).padStart(2, '0');
-      return `${m}/${day} ${d.toISOString().substring(11, 16)}`;
-    };
+    return result;
   }
 
   // --- Charts ---
@@ -484,7 +498,6 @@ export class DashboardComponent implements OnDestroy {
     humidity: number[];
     aqi: number[];
   } | null {
-    const fmt = this.getTimeFormatter();
 
     if (this.isLive) {
       // Per-pole live data
@@ -492,7 +505,7 @@ export class DashboardComponent implements OnDestroy {
         const snapshots = this.poleHistory.get(this.selectedPoleId);
         if (!snapshots || snapshots.length < 2) return null;
         return {
-          times: snapshots.map(s => fmt(s.time)),
+          times: snapshots.map(s => s.time),
           energy: snapshots.map(s => Math.round(s.energy)),
           ped: snapshots.map(s => s.ped),
           veh: snapshots.map(s => s.veh),
@@ -505,7 +518,7 @@ export class DashboardComponent implements OnDestroy {
       // Aggregate live data
       if (this.history.length < 2) return null;
       return {
-        times: this.history.map(h => fmt(h.time)),
+        times: this.history.map(h => h.time),
         energy: this.history.map(h => Math.round(h.totalEnergy)),
         ped: this.history.map(h => h.totalPedestrians),
         veh: this.history.map(h => h.totalVehicles),
@@ -519,7 +532,7 @@ export class DashboardComponent implements OnDestroy {
     // Historical mode
     if (this.selectedPoleId && this.historicalPoleData.length >= 2) {
       return {
-        times: this.historicalPoleData.map(d => fmt(d.bucketStart)),
+        times: this.historicalPoleData.map(d => d.bucketStart),
         energy: this.historicalPoleData.map(d => Math.round(d.avgEnergy)),
         ped: this.historicalPoleData.map(d => Math.round(d.avgPedestrians)),
         veh: this.historicalPoleData.map(d => Math.round(d.avgVehicles)),
@@ -531,7 +544,7 @@ export class DashboardComponent implements OnDestroy {
     }
     if (this.historicalData.length < 2) return null;
     return {
-      times: this.historicalData.map(h => fmt(h.time)),
+      times: this.historicalData.map(h => h.time),
       energy: this.historicalData.map(h => Math.round(h.totalEnergy)),
       ped: this.historicalData.map(h => h.totalPedestrians),
       veh: this.historicalData.map(h => h.totalVehicles),
@@ -570,17 +583,21 @@ export class DashboardComponent implements OnDestroy {
       },
     ] : [];
 
+    const timeFmt = this.getTimeAxisFormat();
+    const timeAxis = { type: 'time' as const, boundaryGap: false as const, axisLabel: { ...AXIS_LABEL, formatter: timeFmt }, axisLine: AXIS_LINE };
+    const tp = this.timePair.bind(this);
+
     this.energyChart?.setOption({
       animation: isHistorical,
       animationDuration: 300,
       grid: { top: 30, right: 16, bottom: gridBottom, left: 50 },
       tooltip: { trigger: 'axis', ...TOOLTIP_STYLE },
-      xAxis: { type: 'category', boundaryGap: false, data: arrays.times, axisLabel: { ...AXIS_LABEL, interval: 'auto' }, axisLine: AXIS_LINE },
+      xAxis: timeAxis,
       yAxis: { type: 'value', name: 'Watts', nameTextStyle: { color: CT.axisLabel }, axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
       dataZoom,
       series: [{
         type: 'line',
-        data: arrays.energy,
+        data: tp(arrays.times, arrays.energy),
         smooth: true,
         symbol: 'none',
         lineStyle: { color: CT.energy, width: 2 },
@@ -594,13 +611,13 @@ export class DashboardComponent implements OnDestroy {
       grid: { top: 30, right: 16, bottom: gridBottom, left: 50 },
       tooltip: { trigger: 'axis', ...TOOLTIP_STYLE },
       legend: { data: ['Pedestrians', 'Vehicles', 'Cyclists'], textStyle: { color: CT.legendText, fontSize: 10 }, top: 0 },
-      xAxis: { type: 'category', boundaryGap: false, data: arrays.times, axisLabel: { ...AXIS_LABEL, interval: 'auto' }, axisLine: AXIS_LINE },
+      xAxis: timeAxis,
       yAxis: { type: 'value', axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
       dataZoom,
       series: [
-        { name: 'Pedestrians', type: 'line', stack: 'traffic', data: arrays.ped, smooth: true, symbol: 'none', areaStyle: { opacity: 0.15 }, lineStyle: { color: CT.pedestrian }, itemStyle: { color: CT.pedestrian } },
-        { name: 'Vehicles', type: 'line', stack: 'traffic', data: arrays.veh, smooth: true, symbol: 'none', areaStyle: { opacity: 0.15 }, lineStyle: { color: CT.vehicle }, itemStyle: { color: CT.vehicle } },
-        { name: 'Cyclists', type: 'line', stack: 'traffic', data: arrays.cyc, smooth: true, symbol: 'none', areaStyle: { opacity: 0.15 }, lineStyle: { color: CT.cyclist }, itemStyle: { color: CT.cyclist } },
+        { name: 'Pedestrians', type: 'line', stack: 'traffic', data: tp(arrays.times, arrays.ped), smooth: true, symbol: 'none', areaStyle: { opacity: 0.15 }, lineStyle: { color: CT.pedestrian }, itemStyle: { color: CT.pedestrian } },
+        { name: 'Vehicles', type: 'line', stack: 'traffic', data: tp(arrays.times, arrays.veh), smooth: true, symbol: 'none', areaStyle: { opacity: 0.15 }, lineStyle: { color: CT.vehicle }, itemStyle: { color: CT.vehicle } },
+        { name: 'Cyclists', type: 'line', stack: 'traffic', data: tp(arrays.times, arrays.cyc), smooth: true, symbol: 'none', areaStyle: { opacity: 0.15 }, lineStyle: { color: CT.cyclist }, itemStyle: { color: CT.cyclist } },
       ],
     }, notMerge);
 
@@ -610,16 +627,16 @@ export class DashboardComponent implements OnDestroy {
       grid: { top: 30, right: 60, bottom: gridBottom, left: 50 },
       tooltip: { trigger: 'axis', ...TOOLTIP_STYLE },
       legend: { data: ['Temp', 'Humidity', 'AQI'], textStyle: { color: CT.legendText, fontSize: 10 }, top: 0 },
-      xAxis: { type: 'category', boundaryGap: false, data: arrays.times, axisLabel: { ...AXIS_LABEL, interval: 'auto' }, axisLine: AXIS_LINE },
+      xAxis: timeAxis,
       yAxis: [
         { type: 'value', name: 'Temp/Humid', axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, nameTextStyle: { color: CT.axisLabel } },
         { type: 'value', name: 'AQI', axisLabel: AXIS_LABEL, splitLine: { show: false }, nameTextStyle: { color: CT.axisLabel } },
       ],
       dataZoom,
       series: [
-        { name: 'Temp', type: 'line', data: arrays.temp, smooth: true, symbol: 'none', lineStyle: { color: CT.temperature }, itemStyle: { color: CT.temperature } },
-        { name: 'Humidity', type: 'line', data: arrays.humidity, smooth: true, symbol: 'none', lineStyle: { color: CT.humidity }, itemStyle: { color: CT.humidity } },
-        { name: 'AQI', type: 'line', yAxisIndex: 1, data: arrays.aqi, smooth: true, symbol: 'none', lineStyle: { color: CT.aqi }, itemStyle: { color: CT.aqi } },
+        { name: 'Temp', type: 'line', data: tp(arrays.times, arrays.temp), smooth: true, symbol: 'none', lineStyle: { color: CT.temperature }, itemStyle: { color: CT.temperature } },
+        { name: 'Humidity', type: 'line', data: tp(arrays.times, arrays.humidity), smooth: true, symbol: 'none', lineStyle: { color: CT.humidity }, itemStyle: { color: CT.humidity } },
+        { name: 'AQI', type: 'line', yAxisIndex: 1, data: tp(arrays.times, arrays.aqi), smooth: true, symbol: 'none', lineStyle: { color: CT.aqi }, itemStyle: { color: CT.aqi } },
       ],
     }, notMerge);
 
@@ -667,8 +684,9 @@ export class DashboardComponent implements OnDestroy {
   private updateHistoricalPoleChart(): void {
     if (!this.selectedPoleId || !this.historicalPoleData.length) return;
 
-    const fmt = this.getTimeFormatter();
-    const times = this.historicalPoleData.map(d => fmt(d.bucketStart));
+    const times = this.historicalPoleData.map(d => d.bucketStart);
+    const timeFmt = this.getTimeAxisFormat();
+    const tp = this.timePair.bind(this);
 
     const dataZoom = [
       { type: 'inside', start: 0, end: 100 },
@@ -687,7 +705,7 @@ export class DashboardComponent implements OnDestroy {
       grid: { top: 30, right: 60, bottom: 50, left: 50 },
       tooltip: { trigger: 'axis', ...TOOLTIP_STYLE },
       legend: { data: ['Energy', 'AQI', 'Noise'], textStyle: { color: CT.legendText, fontSize: 10 }, top: 0 },
-      xAxis: { type: 'category', boundaryGap: false, data: times, axisLabel: { ...AXIS_LABEL, interval: 'auto' }, axisLine: AXIS_LINE },
+      xAxis: { type: 'time' as const, boundaryGap: false as const, axisLabel: { ...AXIS_LABEL, formatter: timeFmt }, axisLine: AXIS_LINE },
       yAxis: [
         { type: 'value', name: 'Energy (W)', axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, nameTextStyle: { color: CT.axisLabel } },
         { type: 'value', name: 'AQI / Noise', axisLabel: AXIS_LABEL, splitLine: { show: false }, nameTextStyle: { color: CT.axisLabel } },
@@ -695,9 +713,9 @@ export class DashboardComponent implements OnDestroy {
       dataZoom,
       radar: undefined,
       series: [
-        { name: 'Energy', type: 'line', data: this.historicalPoleData.map(d => Math.round(d.avgEnergy)), smooth: true, symbol: 'none', lineStyle: { color: CT.energy, width: 2 }, itemStyle: { color: CT.energy } },
-        { name: 'AQI', type: 'line', yAxisIndex: 1, data: this.historicalPoleData.map(d => Math.round(d.avgAqi)), smooth: true, symbol: 'none', lineStyle: { color: CT.aqi }, itemStyle: { color: CT.aqi } },
-        { name: 'Noise', type: 'line', yAxisIndex: 1, data: this.historicalPoleData.map(d => Math.round(d.avgNoise)), smooth: true, symbol: 'none', lineStyle: { color: CT.humidity }, itemStyle: { color: CT.humidity } },
+        { name: 'Energy', type: 'line', data: tp(times, this.historicalPoleData.map(d => Math.round(d.avgEnergy))), smooth: true, symbol: 'none', lineStyle: { color: CT.energy, width: 2 }, itemStyle: { color: CT.energy } },
+        { name: 'AQI', type: 'line', yAxisIndex: 1, data: tp(times, this.historicalPoleData.map(d => Math.round(d.avgAqi))), smooth: true, symbol: 'none', lineStyle: { color: CT.aqi }, itemStyle: { color: CT.aqi } },
+        { name: 'Noise', type: 'line', yAxisIndex: 1, data: tp(times, this.historicalPoleData.map(d => Math.round(d.avgNoise))), smooth: true, symbol: 'none', lineStyle: { color: CT.humidity }, itemStyle: { color: CT.humidity } },
       ],
     }, true);
   }
