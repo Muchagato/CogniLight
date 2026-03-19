@@ -55,6 +55,105 @@
   &.anomaly { color: var(--cl-red); }
 }
 
+.kpi-subtitle {
+  font-size: 10px;
+  color: var(--cl-text-faint);
+  opacity: 0.7;
+}
+
+// --- Range Bar ---
+.range-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--cl-bg-raised);
+  border: 1px solid var(--cl-border);
+  border-radius: var(--cl-radius);
+  box-shadow: var(--cl-shadow-sm);
+}
+
+.range-pills {
+  display: flex;
+  gap: 4px;
+}
+
+.range-pill {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid var(--cl-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--cl-text-faint);
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: var(--cl-bg-hover);
+    color: var(--cl-text-secondary);
+  }
+
+  &.active {
+    color: var(--cl-bg-base);
+    border-color: transparent;
+
+    &.live {
+      background: var(--cl-amber);
+    }
+
+    &:not(.live) {
+      background: var(--cl-cyan);
+    }
+  }
+}
+
+.range-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.range-label {
+  font-size: 11px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: var(--cl-text-faint);
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--cl-border);
+  border-top-color: var(--cl-amber);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.table-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--cl-cyan);
+  border: 1px solid var(--cl-cyan);
+  border-radius: 3px;
+  vertical-align: middle;
+  opacity: 0.7;
+}
+
+.loading-cell {
+  color: var(--cl-text-faint);
+  text-align: center;
+}
+
 // --- Charts Row ---
 .charts-row {
   display: grid;

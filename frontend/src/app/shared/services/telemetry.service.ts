@@ -22,6 +22,52 @@ export interface AnomalyEvent {
   description: string;
 }
 
+export interface HistoryBucket {
+  bucketStart: string;
+  totalEnergy: number;
+  totalPedestrians: number;
+  totalVehicles: number;
+  totalCyclists: number;
+  avgTemperature: number;
+  avgHumidity: number;
+  avgAqi: number;
+  avgNoise: number;
+  anomalyCount: number;
+}
+
+export interface PoleBucket {
+  bucketStart: string;
+  avgEnergy: number;
+  avgPedestrians: number;
+  avgVehicles: number;
+  avgCyclists: number;
+  avgAqi: number;
+  avgNoise: number;
+  avgTemperature: number;
+  avgHumidity: number;
+  avgLightLevel: number;
+  anomalyCount: number;
+}
+
+export type TimeRangeKey = 'live' | '5m' | '15m' | '1h' | '6h' | '1d' | '3d';
+
+export interface TimeRangeConfig {
+  key: TimeRangeKey;
+  label: string;
+  duration: number;   // seconds, 0 for live
+  bucket: number;     // bucket size in seconds, 0 for live
+}
+
+export const TIME_RANGES: TimeRangeConfig[] = [
+  { key: 'live', label: 'LIVE', duration: 0,      bucket: 0 },
+  { key: '5m',   label: '5m',   duration: 300,    bucket: 1 },
+  { key: '15m',  label: '15m',  duration: 900,    bucket: 5 },
+  { key: '1h',   label: '1h',   duration: 3600,   bucket: 10 },
+  { key: '6h',   label: '6h',   duration: 21600,  bucket: 60 },
+  { key: '1d',   label: '1d',   duration: 86400,  bucket: 300 },
+  { key: '3d',   label: '3d',   duration: 259200, bucket: 900 },
+];
+
 const MAX_HISTORY = 120;
 
 @Injectable({ providedIn: 'root' })
@@ -122,6 +168,24 @@ export class TelemetryService implements OnDestroy {
 
   async resume(): Promise<void> {
     await fetch(`${this.apiBase}/simulation/resume`, { method: 'POST' });
+  }
+
+  async getHistory(from: string, to: string, bucketSeconds: number, signal?: AbortSignal): Promise<HistoryBucket[]> {
+    const params = new URLSearchParams({ from, to, bucketSeconds: String(bucketSeconds) });
+    const resp = await fetch(`${this.apiBase}/telemetry/history?${params}`, { signal });
+    return resp.json();
+  }
+
+  async getPoleHistory(poleId: string, from: string, to: string, bucketSeconds: number, signal?: AbortSignal): Promise<PoleBucket[]> {
+    const params = new URLSearchParams({ from, to, bucketSeconds: String(bucketSeconds) });
+    const resp = await fetch(`${this.apiBase}/telemetry/history/${poleId}?${params}`, { signal });
+    return resp.json();
+  }
+
+  async getAnomaliesInRange(from: string, to: string, limit = 200, signal?: AbortSignal): Promise<AnomalyEvent[]> {
+    const params = new URLSearchParams({ from, to, limit: String(limit) });
+    const resp = await fetch(`${this.apiBase}/telemetry/anomalies/range?${params}`, { signal });
+    return resp.json();
   }
 
   ngOnDestroy(): void {

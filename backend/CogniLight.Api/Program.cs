@@ -61,6 +61,33 @@ api.MapGet("/telemetry/{poleId}", async (string poleId, TelemetryService svc) =>
 api.MapGet("/telemetry/anomalies", async (TelemetryService svc) =>
     await svc.GetAnomaliesAsync());
 
+api.MapGet("/telemetry/history", async (string from, string to, int bucketSeconds, TelemetryService svc) =>
+{
+    var fromDt = DateTime.Parse(from, null, System.Globalization.DateTimeStyles.RoundtripKind);
+    var toDt = DateTime.Parse(to, null, System.Globalization.DateTimeStyles.RoundtripKind);
+    return await svc.GetAggregatedHistoryAsync(fromDt, toDt, bucketSeconds);
+});
+
+api.MapGet("/telemetry/history/{poleId}", async (string poleId, string from, string to, int bucketSeconds, TelemetryService svc) =>
+{
+    var fromDt = DateTime.Parse(from, null, System.Globalization.DateTimeStyles.RoundtripKind);
+    var toDt = DateTime.Parse(to, null, System.Globalization.DateTimeStyles.RoundtripKind);
+    return await svc.GetPoleHistoryAsync(poleId, fromDt, toDt, bucketSeconds);
+});
+
+api.MapGet("/telemetry/anomalies/range", async (string from, string to, int? limit, TelemetryService svc) =>
+{
+    var fromDt = DateTime.Parse(from, null, System.Globalization.DateTimeStyles.RoundtripKind);
+    var toDt = DateTime.Parse(to, null, System.Globalization.DateTimeStyles.RoundtripKind);
+    var anomalies = await svc.GetAnomaliesInRangeAsync(fromDt, toDt, limit ?? 200);
+    return anomalies.Select(a => new
+    {
+        time = a.Timestamp.ToString("o"),
+        poleId = a.PoleId,
+        description = a.AnomalyDescription ?? ""
+    });
+});
+
 api.MapGet("/simulation/status", (SimulationEngine engine) =>
     new
     {

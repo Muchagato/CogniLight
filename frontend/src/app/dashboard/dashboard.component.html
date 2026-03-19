@@ -2,39 +2,66 @@
   <!-- KPI Row -->
   <div class="kpi-row">
     <div class="kpi-card">
-      <span class="kpi-label">Total Energy</span>
+      <span class="kpi-label">{{ isLive ? 'Total Energy' : 'Avg Energy' }}</span>
       <span class="kpi-value energy">{{ totalEnergy | number }} W</span>
+      @if (!isLive) { <span class="kpi-subtitle">{{ activeRangeLabel() }}</span> }
     </div>
     <div class="kpi-card">
-      <span class="kpi-label">Pedestrians</span>
+      <span class="kpi-label">{{ isLive ? 'Pedestrians' : 'Avg Pedestrians' }}</span>
       <span class="kpi-value pedestrian">{{ totalPedestrians }}</span>
+      @if (!isLive) { <span class="kpi-subtitle">{{ activeRangeLabel() }}</span> }
     </div>
     <div class="kpi-card">
-      <span class="kpi-label">Vehicles</span>
+      <span class="kpi-label">{{ isLive ? 'Vehicles' : 'Avg Vehicles' }}</span>
       <span class="kpi-value vehicle">{{ totalVehicles }}</span>
+      @if (!isLive) { <span class="kpi-subtitle">{{ activeRangeLabel() }}</span> }
     </div>
     <div class="kpi-card">
       <span class="kpi-label">Avg AQI</span>
       <span class="kpi-value" [ngClass]="aqiClass(avgAqi)">{{ avgAqi }}</span>
+      @if (!isLive) { <span class="kpi-subtitle">{{ activeRangeLabel() }}</span> }
     </div>
     <div class="kpi-card" [class.alert]="activeAnomalies > 0">
-      <span class="kpi-label">Anomalies</span>
+      <span class="kpi-label">{{ isLive ? 'Anomalies' : 'Total Anomalies' }}</span>
       <span class="kpi-value anomaly">{{ activeAnomalies }}</span>
+      @if (!isLive) { <span class="kpi-subtitle">{{ activeRangeLabel() }}</span> }
+    </div>
+  </div>
+
+  <!-- Time Range Selector -->
+  <div class="range-bar">
+    <div class="range-pills">
+      @for (r of ranges; track r.key) {
+        <button class="range-pill"
+                [class.active]="activeRange === r.key"
+                [class.live]="r.key === 'live'"
+                (click)="onRangeChange(r.key)">
+          {{ r.label }}
+        </button>
+      }
+    </div>
+    <div class="range-info">
+      @if (loading) {
+        <span class="spinner"></span>
+      }
+      @if (rangeLabel) {
+        <span class="range-label">{{ rangeLabel }}</span>
+      }
     </div>
   </div>
 
   <!-- Charts Row -->
   <div class="charts-row">
     <div class="chart-panel">
-      <h3>Energy Consumption</h3>
+      <h3>{{ energyTitle }}</h3>
       <div echarts [options]="initOpts" [autoResize]="true" (chartInit)="onEnergyChartInit($event)" class="chart"></div>
     </div>
     <div class="chart-panel">
-      <h3>Traffic Density</h3>
+      <h3>{{ trafficTitle }}</h3>
       <div echarts [options]="initOpts" [autoResize]="true" (chartInit)="onTrafficChartInit($event)" class="chart"></div>
     </div>
     <div class="chart-panel">
-      <h3>Environmental</h3>
+      <h3>{{ envTitle }}</h3>
       <div echarts [options]="initOpts" [autoResize]="true" (chartInit)="onEnvChartInit($event)" class="chart"></div>
     </div>
   </div>
@@ -42,7 +69,10 @@
   <!-- Per-Pole Detail + Anomaly Log -->
   <div class="detail-row">
     <div class="pole-table-panel">
-      <h3>Per-Pole Readings</h3>
+      <h3>
+        Per-Pole Readings
+        @if (!isLive) { <span class="table-badge">AVG</span> }
+      </h3>
       <div class="pole-table-scroll">
         <table class="pole-table">
           <thead>
@@ -54,29 +84,49 @@
               <th>Light</th>
               <th>AQI</th>
               <th>Noise</th>
-              <th>Status</th>
+              <th>{{ isLive ? 'Status' : 'Anomalies' }}</th>
             </tr>
           </thead>
           <tbody>
-            @for (r of readings; track r.poleId) {
-              <tr [class.selected]="selectedPoleId === r.poleId"
-                  [class.anomaly-row]="r.anomalyFlag"
-                  (click)="selectPole(r.poleId)">
-                <td class="pole-id">{{ r.poleId }}</td>
-                <td>{{ r.energyWatts | number:'1.0-0' }}</td>
-                <td>{{ r.pedestrianCount }}</td>
-                <td>{{ r.vehicleCount }}</td>
-                <td>{{ r.lightLevelPct | number:'1.0-0' }}%</td>
-                <td>{{ r.airQualityAqi }}</td>
-                <td>{{ r.noiseDb | number:'1.0-0' }}</td>
-                <td>
-                  @if (r.anomalyFlag) {
-                    <span class="status-badge red">ALERT</span>
+            @if (isLive) {
+              @for (r of readings; track r.poleId) {
+                <tr [class.selected]="selectedPoleId === r.poleId"
+                    [class.anomaly-row]="r.anomalyFlag"
+                    (click)="selectPole(r.poleId)">
+                  <td class="pole-id">{{ r.poleId }}</td>
+                  <td>{{ r.energyWatts | number:'1.0-0' }}</td>
+                  <td>{{ r.pedestrianCount }}</td>
+                  <td>{{ r.vehicleCount }}</td>
+                  <td>{{ r.lightLevelPct | number:'1.0-0' }}%</td>
+                  <td>{{ r.airQualityAqi }}</td>
+                  <td>{{ r.noiseDb | number:'1.0-0' }}</td>
+                  <td>
+                    @if (r.anomalyFlag) {
+                      <span class="status-badge red">ALERT</span>
+                    } @else {
+                      <span class="status-badge green">OK</span>
+                    }
+                  </td>
+                </tr>
+              }
+            } @else {
+              @for (r of readings; track r.poleId) {
+                <tr [class.selected]="selectedPoleId === r.poleId"
+                    (click)="selectPole(r.poleId)">
+                  <td class="pole-id">{{ r.poleId }}</td>
+                  @if (historicalPoleAverages.has(r.poleId)) {
+                    <td>{{ historicalPoleAverages.get(r.poleId)!.energy }}</td>
+                    <td>{{ historicalPoleAverages.get(r.poleId)!.ped }}</td>
+                    <td>{{ historicalPoleAverages.get(r.poleId)!.veh }}</td>
+                    <td>{{ historicalPoleAverages.get(r.poleId)!.light }}%</td>
+                    <td>{{ historicalPoleAverages.get(r.poleId)!.aqi }}</td>
+                    <td>{{ historicalPoleAverages.get(r.poleId)!.noise }}</td>
+                    <td>{{ historicalPoleAverages.get(r.poleId)!.anomalies }}</td>
                   } @else {
-                    <span class="status-badge green">OK</span>
+                    <td colspan="7" class="loading-cell">—</td>
                   }
-                </td>
-              </tr>
+                </tr>
+              }
             }
           </tbody>
         </table>
@@ -87,7 +137,7 @@
       <!-- Pole detail chart -->
       @if (selectedPoleId) {
         <div class="chart-panel small">
-          <h3>{{ selectedPoleId }} Detail</h3>
+          <h3>{{ selectedPoleId }} {{ isLive ? 'Detail' : 'History' }}</h3>
           <div echarts [options]="initOpts" [autoResize]="true" (chartInit)="onPoleChartInit($event)" class="chart"></div>
         </div>
       }
@@ -104,7 +154,7 @@
             </div>
           }
           @if (anomalies.length === 0) {
-            <div class="empty-state">No anomalies detected yet.</div>
+            <div class="empty-state">No anomalies detected{{ isLive ? ' yet' : ' in this period' }}.</div>
           }
         </div>
       </div>
