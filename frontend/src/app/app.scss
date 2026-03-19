@@ -34,7 +34,7 @@
   }
 }
 
-.map-toggle {
+.chat-toggle {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -62,9 +62,13 @@
   }
 }
 
-.map-toggle-icon {
+.chat-toggle-icon {
   font-size: 13px;
   line-height: 1;
+}
+
+.nav-spacer {
+  flex: 1;
 }
 
 main {

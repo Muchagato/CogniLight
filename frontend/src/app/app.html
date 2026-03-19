@@ -1,11 +1,11 @@
 <nav class="top-nav">
   <span class="brand">CogniLight</span>
-  <button class="map-toggle" [class.active]="!layout.simCollapsed()" (click)="layout.toggleSim()">
-    <span class="map-toggle-icon">&#9635;</span>
-    {{ layout.simCollapsed() ? 'Show Map' : 'Hide Map' }}
+  <div class="nav-spacer"></div>
+  <button class="chat-toggle" [class.active]="layout.chatOpen()" (click)="layout.toggleChat()">
+    <span class="chat-toggle-icon">&#x1F4AC;</span>
+    {{ layout.chatOpen() ? 'Hide AI' : 'Show AI' }}
   </button>
 </nav>
 <main>
   <router-outlet />
 </main>
-<app-chat />

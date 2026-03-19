@@ -46,6 +46,7 @@ export const TOOLTIP_STYLE = {
 export const AXIS_LABEL = {
   color: CT.axisLabel,
   fontSize: 10,
+  hideOverlap: true,
 } as const;
 
 /** Shared axis line style */

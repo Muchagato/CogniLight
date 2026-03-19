@@ -40,7 +40,7 @@
 // --- KPI Row ---
 .kpi-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   flex-shrink: 0;
 }
@@ -232,7 +232,7 @@
 // --- Charts Row ---
 .charts-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   flex-shrink: 0;
 }
@@ -244,6 +244,8 @@
   padding: 16px;
   box-shadow: var(--cl-shadow-sm);
   transition: box-shadow 0.2s;
+  min-width: 0;
+  overflow: hidden;
 
   &:hover {
     box-shadow: var(--cl-shadow-md);

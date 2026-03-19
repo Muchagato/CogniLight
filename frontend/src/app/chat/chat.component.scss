@@ -1,69 +1,18 @@
-// Floating action button
-.chat-fab {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 1000;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: var(--cl-amber);
-  border: none;
-  cursor: pointer;
-  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.25);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  &:hover {
-    background: var(--cl-amber-hover);
-    transform: scale(1.08);
-    box-shadow: 0 6px 24px rgba(245, 158, 11, 0.35);
-  }
-
-  &.open {
-    background: var(--cl-text-faint);
-    box-shadow: var(--cl-shadow-md);
-    &:hover {
-      background: var(--cl-text-muted);
-    }
-  }
-}
-
-.fab-icon {
-  font-size: 22px;
-  line-height: 1;
-  color: #ffffff;
-}
-
-// Chat panel
-.chat-panel {
-  position: fixed;
-  bottom: 88px;
-  right: 24px;
-  z-index: 999;
-  width: 380px;
-  height: 520px;
-  background: var(--cl-bg-raised);
-  border: 1px solid var(--cl-border);
-  border-radius: var(--cl-radius-lg);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+:host {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  animation: slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 100%;
+  min-height: 0;
 }
 
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(16px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+// Chat panel — inline, fills parent container
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--cl-bg-raised);
+  overflow: hidden;
 }
 
 .chat-header {
@@ -71,7 +20,7 @@
   background: var(--cl-bg-inset);
   border-bottom: 1px solid var(--cl-border);
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   flex-shrink: 0;
 }
@@ -87,6 +36,29 @@
   color: var(--cl-text-faint);
 }
 
+.chat-close {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--cl-border);
+  color: var(--cl-text-faint);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+
+  &:hover {
+    background: var(--cl-bg-hover);
+    color: var(--cl-text-primary);
+    border-color: var(--cl-text-faint);
+  }
+}
+
 .messages {
   flex: 1;
   overflow-y: auto;
@@ -95,6 +67,7 @@
   flex-direction: column;
   gap: 10px;
   background: var(--cl-bg-raised);
+  min-height: 0;
 }
 
 .welcome {

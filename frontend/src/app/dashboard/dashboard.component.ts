@@ -616,7 +616,7 @@ export class DashboardComponent implements OnDestroy {
     this.trafficChart?.setOption({
       animation: isHistorical,
       animationDuration: 300,
-      grid: { top: 30, right: 16, bottom: gridBottom, left: 50 },
+      grid: { top: 36, right: 16, bottom: gridBottom, left: 50 },
       tooltip: { trigger: 'axis', ...TOOLTIP_STYLE },
       legend: { data: ['Pedestrians', 'Vehicles', 'Cyclists'], textStyle: { color: CT.legendText, fontSize: 10 }, top: 0 },
       xAxis: timeAxis,
@@ -632,13 +632,13 @@ export class DashboardComponent implements OnDestroy {
     this.envChart?.setOption({
       animation: isHistorical,
       animationDuration: 300,
-      grid: { top: 30, right: 60, bottom: gridBottom, left: 50 },
+      grid: { top: 36, right: 50, bottom: gridBottom, left: 50 },
       tooltip: { trigger: 'axis', ...TOOLTIP_STYLE },
       legend: { data: ['Temp', 'Humidity', 'AQI'], textStyle: { color: CT.legendText, fontSize: 10 }, top: 0 },
       xAxis: timeAxis,
       yAxis: [
-        { type: 'value', name: 'Temp/Humid', axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, nameTextStyle: { color: CT.axisLabel } },
-        { type: 'value', name: 'AQI', axisLabel: AXIS_LABEL, splitLine: { show: false }, nameTextStyle: { color: CT.axisLabel } },
+        { type: 'value', axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
+        { type: 'value', axisLabel: AXIS_LABEL, splitLine: { show: false } },
       ],
       dataZoom,
       series: [

@@ -1,6 +1,7 @@
-import { Component, ElementRef, ViewChild } from '@angular/core';
+import { Component, ElementRef, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { LayoutService } from '../shared/services/layout.service';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -19,7 +20,7 @@ interface ChatMessage {
 export class ChatComponent {
   @ViewChild('messagesContainer') messagesContainer!: ElementRef<HTMLDivElement>;
 
-  open = false;
+  protected readonly layout = inject(LayoutService);
   messages: ChatMessage[] = [];
   inputText = '';
   loading = false;
@@ -33,7 +34,7 @@ export class ChatComponent {
   private readonly apiBase = 'http://localhost:8000/api';
 
   toggle(): void {
-    this.open = !this.open;
+    this.layout.toggleChat();
   }
 
   async sendMessage(text?: string): Promise<void> {
