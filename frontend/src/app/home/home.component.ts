@@ -14,10 +14,10 @@ import { LayoutService } from '../shared/services/layout.service';
       <section class="sim-section" [class.collapsed]="layout.simCollapsed()">
         <app-simulation />
       </section>
-      <div class="divider">
-        <button class="divider-toggle" (click)="layout.toggleSim()" [title]="layout.simCollapsed() ? 'Show map' : 'Hide map'">
+      <div class="divider" (click)="layout.toggleSim()" [title]="layout.simCollapsed() ? 'Show map' : 'Hide map'">
+        <div class="divider-toggle">
           <span class="divider-arrow" [class.collapsed]="layout.simCollapsed()">&#9666;</span>
-        </button>
+        </div>
       </div>
       <section class="dash-section">
         <app-dashboard />
@@ -58,31 +58,35 @@ import { LayoutService } from '../shared/services/layout.service';
       width: 1px;
       background: var(--cl-border);
       flex-shrink: 0;
+      cursor: pointer;
+      transition: box-shadow 0.2s;
+
+      &:hover {
+        box-shadow: 0 0 8px rgba(245, 158, 11, 0.25);
+
+        .divider-toggle {
+          background: var(--cl-bg-hover);
+          color: var(--cl-text-primary);
+          border-color: var(--cl-text-faint);
+        }
+      }
     }
     .divider-toggle {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: 20px;
-      height: 48px;
-      border-radius: 4px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
       background: var(--cl-bg-raised);
       border: 1px solid var(--cl-border);
       color: var(--cl-text-faint);
-      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 0;
       z-index: 5;
       transition: background 0.15s, color 0.15s, border-color 0.15s;
-
-      &:hover {
-        background: var(--cl-bg-hover);
-        color: var(--cl-text-primary);
-        border-color: var(--cl-text-faint);
-      }
     }
     .divider-arrow {
       font-size: 12px;
