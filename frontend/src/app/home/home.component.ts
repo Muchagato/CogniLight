@@ -24,11 +24,9 @@ import { LayoutService } from '../shared/services/layout.service';
           <app-dashboard />
         </section>
       }
-      @if (layout.chatOpen()) {
-        <section class="chat-section" [class.fullscreen]="layout.chatFullscreen()">
-          <app-chat />
-        </section>
-      }
+      <section class="chat-section" [class.fullscreen]="layout.chatFullscreen()" [hidden]="!layout.chatOpen()">
+        <app-chat />
+      </section>
     </div>
   `,
   styles: [`

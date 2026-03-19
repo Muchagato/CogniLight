@@ -2,24 +2,39 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from sqlalchemy import create_engine, text
 
-from anomaly.detector import detect_anomalies, summarize_anomalies, AnomalyReport
-from rag.chain import generate_response
-from rag.retriever import Chunk, Retriever
+# Load .env BEFORE importing modules that read env vars at import time
+# Search parent directories so it finds the project-root .env
+from pathlib import Path
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(_env_path)
 
-load_dotenv()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+from fastapi import FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
+from sqlalchemy import create_engine, text  # noqa: E402
+from sse_starlette.sse import EventSourceResponse  # noqa: E402
+
+from anomaly.detector import detect_anomalies, summarize_anomalies, AnomalyReport  # noqa: E402
+from rag.chain import generate_response, generate_response_stream, is_llm_configured  # noqa: E402
+from rag.retriever import Chunk, Retriever  # noqa: E402
 
 DB_PATH = os.getenv("DATABASE_PATH", "../backend/CogniLight.Api/cognilight.db")
 INGEST_INTERVAL = int(os.getenv("INGEST_INTERVAL", "10"))  # seconds
+
+if is_llm_configured():
+    logger.info("LLM API key is set (provider=%s, model=%s)", os.getenv("LLM_PROVIDER", "anthropic"), os.getenv("LLM_MODEL", "default"))
+else:
+    logger.warning("LLM API key is NOT set — chat will be disabled")
 
 retriever = Retriever()
 _latest_anomalies: list[AnomalyReport] = []
@@ -157,6 +172,11 @@ async def health() -> dict[str, str]:
     return {"status": "ok", "service": "ai-service", "index_size": str(retriever.size)}
 
 
+@app.get("/api/chat/status")
+async def chat_status() -> dict[str, bool]:
+    return {"configured": is_llm_configured()}
+
+
 # --- Chat ---
 
 class ChatRequest(BaseModel):
@@ -172,6 +192,17 @@ class ChatResponse(BaseModel):
 async def chat(request: ChatRequest) -> ChatResponse:
     reply, sources = await generate_response(request.message, retriever)
     return ChatResponse(reply=reply, sources=sources)
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(request: ChatRequest):
+    import json
+
+    async def event_generator():
+        async for event in generate_response_stream(request.message, retriever):
+            yield {"event": event["event"], "data": json.dumps(event["data"])}
+
+    return EventSourceResponse(event_generator())
 
 
 # --- Anomaly detection ---

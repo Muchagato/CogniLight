@@ -27,6 +27,9 @@ services:
     environment:
       - DATABASE_PATH=/data/cognilight.db
       - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_MODEL=${LLM_MODEL:-}
     volumes:
       - db-data:/data
 

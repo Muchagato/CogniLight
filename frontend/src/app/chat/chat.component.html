@@ -24,13 +24,23 @@
   <div class="messages" #messagesContainer>
     @if (messages.length === 0) {
       <div class="welcome">
-        <h3>Ask me about the lighting network</h3>
-        <p>I can analyze telemetry data, detect patterns, and identify anomalies.</p>
-        <div class="suggestions">
-          @for (s of suggestions; track s) {
-            <button class="suggestion-btn" (click)="sendMessage(s)">{{ s }}</button>
-          }
-        </div>
+        @if (!ai.configured()) {
+          <div class="no-api-key">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+            </svg>
+            <h3>API key required</h3>
+            <p>Set <code>LLM_API_KEY</code> in your <code>.env</code> file and restart the AI service.</p>
+          </div>
+        } @else {
+          <h3>Ask me about the lighting network</h3>
+          <p>I can analyze telemetry data, detect patterns, and identify anomalies.</p>
+          <div class="suggestions">
+            @for (s of suggestions; track s) {
+              <button class="suggestion-btn" (click)="sendMessage(s)">{{ s }}</button>
+            }
+          </div>
+        }
       </div>
     }
 
@@ -93,10 +103,11 @@
     <textarea
       [(ngModel)]="inputText"
       (keydown)="onKeydown($event)"
-      placeholder="Ask about energy, traffic, anomalies..."
+      [placeholder]="ai.configured() ? 'Ask about energy, traffic, anomalies...' : 'LLM API key not configured'"
+      [disabled]="!ai.configured()"
       rows="1"
     ></textarea>
-    <button class="send-btn" (click)="sendMessage()" [disabled]="loading || !inputText.trim()" title="Send message">
+    <button class="send-btn" (click)="sendMessage()" [disabled]="!ai.configured() || loading || !inputText.trim()" title="Send message">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <line x1="22" y1="2" x2="11" y2="13"/>
         <polygon points="22 2 15 22 11 13 2 9 22 2"/>
