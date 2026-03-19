@@ -26,7 +26,6 @@ export class SimulationComponent implements AfterViewInit, OnDestroy {
   simulationTime = '';
   connected = false;
   selectedPoleId: string | null = null;
-  running = true;
 
   ngAfterViewInit(): void {
     const canvas = this.canvasRef.nativeElement;
@@ -67,16 +66,6 @@ export class SimulationComponent implements AfterViewInit, OnDestroy {
 
     // Run animation loop outside Angular zone for performance
     this.zone.runOutsideAngular(() => this.renderer.startLoop());
-  }
-
-  toggleRunning(): void {
-    this.running = !this.running;
-    this.renderer.setPaused(!this.running);
-    if (this.running) {
-      this.telemetry.resume();
-    } else {
-      this.telemetry.pause();
-    }
   }
 
   ngOnDestroy(): void {

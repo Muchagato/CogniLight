@@ -11,7 +11,6 @@ public class SimulationEngine : IHostedService, IDisposable
     private readonly ILogger<SimulationEngine> _logger;
     private Timer? _timer;
     private readonly Random _rng = new(42);
-    private bool _running = true;
 
     private static readonly string[] PoleIds =
         Enumerable.Range(1, 12).Select(i => $"POLE-{i:D2}").ToArray();
@@ -185,8 +184,6 @@ public class SimulationEngine : IHostedService, IDisposable
 
     private async void Tick(object? state)
     {
-        if (!_running) return;
-
         try
         {
             var now = DateTime.UtcNow;
@@ -369,10 +366,6 @@ public class SimulationEngine : IHostedService, IDisposable
         var chosen = candidates[_rng.Next(candidates.Count)];
         return (true, chosen);
     }
-
-    public bool IsRunning => _running;
-
-    public void SetRunning(bool running) => _running = running;
 
     public static object[] GetPoleLayout() =>
         PoleIds.Select((id, i) => new

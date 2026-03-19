@@ -89,26 +89,13 @@ api.MapGet("/telemetry/anomalies/range", async (string from, string to, int? lim
     });
 });
 
-api.MapGet("/simulation/status", (SimulationEngine engine) =>
+api.MapGet("/simulation/status", () =>
     new
     {
         time = DateTime.UtcNow.ToString("o"),
-        running = engine.IsRunning,
     });
 
 api.MapGet("/simulation/poles", () => SimulationEngine.GetPoleLayout());
-
-api.MapPost("/simulation/pause", (SimulationEngine engine) =>
-{
-    engine.SetRunning(false);
-    return Results.Ok(new { running = false });
-});
-
-api.MapPost("/simulation/resume", (SimulationEngine engine) =>
-{
-    engine.SetRunning(true);
-    return Results.Ok(new { running = true });
-});
 
 // SignalR hub
 app.MapHub<TelemetryHub>("/hubs/telemetry");

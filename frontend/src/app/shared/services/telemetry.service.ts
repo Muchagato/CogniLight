@@ -162,14 +162,6 @@ export class TelemetryService implements OnDestroy {
 
   private readonly apiBase = 'http://localhost:5000/api';
 
-  async pause(): Promise<void> {
-    await fetch(`${this.apiBase}/simulation/pause`, { method: 'POST' });
-  }
-
-  async resume(): Promise<void> {
-    await fetch(`${this.apiBase}/simulation/resume`, { method: 'POST' });
-  }
-
   async getHistory(from: string, to: string, bucketSeconds: number, signal?: AbortSignal): Promise<HistoryBucket[]> {
     const params = new URLSearchParams({ from, to, bucketSeconds: String(bucketSeconds) });
     const resp = await fetch(`${this.apiBase}/telemetry/history?${params}`, { signal });

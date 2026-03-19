@@ -28,7 +28,6 @@ export class SimulationRenderer {
 
   private hour = 12;
   private selectedPoleId: string | null = null;
-  private _paused = false;
   private lastFrameTime = 0;
 
   /** Per-pole readings for entity sync (capped for visual clarity) */
@@ -58,10 +57,6 @@ export class SimulationRenderer {
 
   setSelectedPole(poleId: string | null): void {
     this.selectedPoleId = poleId;
-  }
-
-  setPaused(paused: boolean): void {
-    this._paused = paused;
   }
 
   updateReadings(readings: TelemetryReading[]): void {
@@ -127,7 +122,6 @@ export class SimulationRenderer {
   }
 
   private update(dt: number): void {
-    if (this._paused) return;
     this.entityManager.update(dt);
   }
 
