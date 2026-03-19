@@ -92,6 +92,11 @@ export class DashboardComponent implements OnDestroy {
   private historicalPoleData: PoleBucket[] = [];
   private abortController: AbortController | null = null;
 
+  // Rolling window refresh for historical ranges
+  private refreshTickCounter = 0;
+  private refreshIntervalTicks = 0;
+  private refreshInFlight = false;
+
   // Mode tracking for notMerge
   private lastWasHistorical = false;
   private lastPoleId: string | null = null;
@@ -118,6 +123,19 @@ export class DashboardComponent implements OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(t => {
         this.simulationTime = t;
+
+        // Rolling window: periodically re-fetch historical data
+        if (!this.isLive && this.refreshIntervalTicks > 0 && !this.refreshInFlight) {
+          this.refreshTickCounter++;
+          if (this.refreshTickCounter >= this.refreshIntervalTicks) {
+            this.refreshTickCounter = 0;
+            this.refreshInFlight = true;
+            this.refreshHistoricalWindow().finally(() => {
+              this.refreshInFlight = false;
+            });
+          }
+        }
+
         this.cdr.detectChanges();
       });
 
@@ -223,6 +241,9 @@ export class DashboardComponent implements OnDestroy {
       this.historicalData = [];
       this.historicalPoleData = [];
       this.historicalPoleAverages.clear();
+      this.refreshTickCounter = 0;
+      this.refreshIntervalTicks = 0;
+      this.refreshInFlight = false;
       this.updateKpis(this.readings);
       this.anomalies = this.telemetry['anomalyLog'] || [];
       this.updateCharts();
@@ -276,6 +297,10 @@ export class DashboardComponent implements OnDestroy {
         this.fetchPoleHistory();
       }
       this.fetchHistoricalPoleAverages(fromIso, toIso, range.bucket, signal);
+
+      // Start rolling window refresh
+      this.refreshTickCounter = 0;
+      this.refreshIntervalTicks = this.getRefreshInterval(range);
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
         console.error('Failed to fetch history:', e);
@@ -675,6 +700,64 @@ export class DashboardComponent implements OnDestroy {
         { name: 'Noise', type: 'line', yAxisIndex: 1, data: this.historicalPoleData.map(d => Math.round(d.avgNoise)), smooth: true, symbol: 'none', lineStyle: { color: CT.humidity }, itemStyle: { color: CT.humidity } },
       ],
     }, true);
+  }
+
+  /** Returns how many simulation ticks to wait between rolling-window refreshes. */
+  private getRefreshInterval(range: TimeRangeConfig): number {
+    return Math.min(Math.max(range.bucket, 5), 120);
+  }
+
+  /** Re-fetch historical data with the current simulation time as the new window edge. */
+  private async refreshHistoricalWindow(): Promise<void> {
+    const range = TIME_RANGES.find(r => r.key === this.activeRange);
+    if (!range || range.key === 'live') return;
+
+    const now = this.simulationTime ? new Date(this.simulationTime) : new Date();
+    const from = new Date(now.getTime() - range.duration * 1000);
+    const fromIso = from.toISOString();
+    const toIso = now.toISOString();
+
+    this.rangeLabel = this.formatRangeLabel(from, now, range);
+
+    this.abortController?.abort();
+    this.abortController = new AbortController();
+    const signal = this.abortController.signal;
+
+    try {
+      const [buckets, anomalies] = await Promise.all([
+        this.telemetry.getHistory(fromIso, toIso, range.bucket, signal),
+        this.telemetry.getAnomaliesInRange(fromIso, toIso, 200, signal),
+      ]);
+
+      if (signal.aborted) return;
+
+      this.historicalData = buckets.map(b => ({
+        time: b.bucketStart,
+        totalEnergy: b.totalEnergy,
+        totalPedestrians: Math.round(b.totalPedestrians),
+        totalVehicles: Math.round(b.totalVehicles),
+        totalCyclists: Math.round(b.totalCyclists),
+        avgAqi: Math.round(b.avgAqi),
+        avgTemperature: +b.avgTemperature.toFixed(1),
+        avgHumidity: +b.avgHumidity.toFixed(1),
+        avgNoise: +b.avgNoise.toFixed(1),
+        anomalyCount: b.anomalyCount,
+      }));
+
+      this.anomalies = anomalies;
+      this.updateHistoricalKpis(this.historicalData);
+      this.updateCharts();
+
+      if (this.selectedPoleId) {
+        this.fetchPoleHistory();
+      }
+
+      this.cdr.detectChanges();
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') {
+        console.error('Failed to refresh historical window:', e);
+      }
+    }
   }
 
   ngOnDestroy(): void {
