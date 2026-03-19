@@ -45,6 +45,7 @@ export class SimulationRenderer {
     this.resize();
     window.addEventListener('resize', this.resizeHandler);
     canvas.addEventListener('click', this.clickHandler);
+    canvas.addEventListener('mousemove', this.mouseMoveHandler);
 
     // Watch for parent container size changes (e.g. sidebar collapse/expand)
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -101,6 +102,7 @@ export class SimulationRenderer {
     cancelAnimationFrame(this.animFrameId);
     window.removeEventListener('resize', this.resizeHandler);
     this.canvas.removeEventListener('click', this.clickHandler);
+    this.canvas.removeEventListener('mousemove', this.mouseMoveHandler);
     this.resizeObserver?.disconnect();
   }
 
@@ -108,6 +110,7 @@ export class SimulationRenderer {
 
   private resizeHandler = () => this.resize();
   private clickHandler = (e: MouseEvent) => this.handleClick(e);
+  private mouseMoveHandler = (e: MouseEvent) => this.handleMouseMove(e);
 
   private resize(): void {
     const rect = this.canvas.parentElement!.getBoundingClientRect();
@@ -168,6 +171,24 @@ export class SimulationRenderer {
     }
     const t = (h - 18) / 2;
     return lerpColor(RT.skyDay, RT.skyNight, t);
+  }
+
+  private handleMouseMove(e: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const { wx, wy } = this.proj.screenToWorld(sx, sy);
+
+    let overPole = false;
+    for (const pole of this.poles) {
+      const dx = pole.wx - wx;
+      const dy = pole.wy - wy;
+      if (dx * dx + dy * dy < 64) { // 8^2 world-unit radius
+        overPole = true;
+        break;
+      }
+    }
+    this.canvas.style.cursor = overPole ? 'pointer' : 'default';
   }
 
   private handleClick(e: MouseEvent): void {

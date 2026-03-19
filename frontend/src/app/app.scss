@@ -1,61 +1,70 @@
 .top-nav {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
   padding: 0 24px;
   height: 48px;
   background: var(--cl-bg-raised);
   border-bottom: 1px solid var(--cl-border);
-  box-shadow: var(--cl-shadow-sm);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.3);
+  position: relative;
+  z-index: 10;
 }
 
 .brand {
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--cl-amber);
-  letter-spacing: 1px;
-  font-family: 'Inter', sans-serif;
+  letter-spacing: 1.5px;
+  font-family: 'Outfit', sans-serif;
   text-decoration: none;
+  text-shadow: 0 0 24px rgba(245, 158, 11, 0.35);
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--cl-amber), transparent);
+    border-radius: 1px;
+    opacity: 0.5;
+  }
 }
 
-.view-toggle {
-  position: relative;
+.map-toggle {
   display: flex;
-  background: var(--cl-bg-inset);
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  color: var(--cl-text-faint);
+  background: var(--cl-bg-base);
   border: 1px solid var(--cl-border);
   border-radius: 6px;
   cursor: pointer;
-  user-select: none;
-  overflow: hidden;
-}
+  transition: all 0.2s;
+  white-space: nowrap;
 
-.toggle-option {
-  position: relative;
-  z-index: 1;
-  padding: 4px 14px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--cl-text-faint);
-  transition: color 0.2s;
+  &:hover {
+    color: var(--cl-text-secondary);
+    background: var(--cl-bg-hover);
+  }
 
   &.active {
-    color: var(--cl-text-primary);
+    color: var(--cl-amber);
+    border-color: rgba(245, 158, 11, 0.3);
+    background: rgba(245, 158, 11, 0.08);
   }
 }
 
-.toggle-slider {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: calc(50% - 2px);
-  height: calc(100% - 4px);
-  background: var(--cl-bg-active);
-  border-radius: 4px;
-  transition: left 0.2s ease;
-
-  &.right {
-    left: 50%;
-  }
+.map-toggle-icon {
+  font-size: 13px;
+  line-height: 1;
 }
 
 main {

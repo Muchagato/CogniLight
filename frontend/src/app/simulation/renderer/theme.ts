@@ -7,18 +7,18 @@
 
 export const RT = {
   // --- Sky ---
-  skyDay: '#161921',       // matches --cl-bg-raised
-  skyNight: '#0f1115',     // matches --cl-bg-base
+  skyDay: '#14171e',       // matches --cl-bg-raised
+  skyNight: '#0c0e12',     // matches --cl-bg-base
 
   // --- Ground ---
-  ground: '#1a1d23',       // matches --cl-bg-inset
+  ground: '#181c24',       // matches --cl-bg-inset
   sidewalk: '#1e2230',     // matches --cl-bg-hover
   road: '#262b3a',         // matches --cl-bg-active
   laneMarking: '#f59e0b33',
 
   // --- Buildings ---
-  buildingFill: '#161921', // matches --cl-bg-raised
-  buildingStroke: '#2a2e38', // matches --cl-border
+  buildingFill: '#14171e', // matches --cl-bg-raised
+  buildingStroke: '#252a36', // matches --cl-border
   buildingLabel: '#64748b',  // matches --cl-text-faint
 
   // --- Poles ---

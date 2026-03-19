@@ -2,27 +2,42 @@
   <!-- KPI Row -->
   <div class="kpi-row">
     <div class="kpi-card">
-      <span class="kpi-label">{{ isLive ? 'Total Energy' : 'Avg Energy' }}</span>
+      <div class="kpi-header">
+        <span class="kpi-icon">&#9889;</span>
+        <span class="kpi-label">{{ isLive ? 'Total Energy' : 'Avg Energy' }}</span>
+      </div>
       <span class="kpi-value energy">{{ totalEnergy | number }} W</span>
       @if (!isLive) { <span class="kpi-subtitle">{{ activeRangeLabel() }}</span> }
     </div>
     <div class="kpi-card">
-      <span class="kpi-label">{{ isLive ? 'Pedestrians' : 'Avg Pedestrians' }}</span>
+      <div class="kpi-header">
+        <span class="kpi-icon">&#128694;</span>
+        <span class="kpi-label">{{ isLive ? 'Pedestrians' : 'Avg Pedestrians' }}</span>
+      </div>
       <span class="kpi-value pedestrian">{{ totalPedestrians }}</span>
       @if (!isLive) { <span class="kpi-subtitle">{{ activeRangeLabel() }}</span> }
     </div>
     <div class="kpi-card">
-      <span class="kpi-label">{{ isLive ? 'Vehicles' : 'Avg Vehicles' }}</span>
+      <div class="kpi-header">
+        <span class="kpi-icon">&#128663;</span>
+        <span class="kpi-label">{{ isLive ? 'Vehicles' : 'Avg Vehicles' }}</span>
+      </div>
       <span class="kpi-value vehicle">{{ totalVehicles }}</span>
       @if (!isLive) { <span class="kpi-subtitle">{{ activeRangeLabel() }}</span> }
     </div>
     <div class="kpi-card">
-      <span class="kpi-label">Avg AQI</span>
+      <div class="kpi-header">
+        <span class="kpi-icon">&#127811;</span>
+        <span class="kpi-label">Avg AQI</span>
+      </div>
       <span class="kpi-value" [ngClass]="aqiClass(avgAqi)">{{ avgAqi }}</span>
       @if (!isLive) { <span class="kpi-subtitle">{{ activeRangeLabel() }}</span> }
     </div>
     <div class="kpi-card" [class.alert]="activeAnomalies > 0">
-      <span class="kpi-label">{{ isLive ? 'Anomalies' : 'Total Anomalies' }}</span>
+      <div class="kpi-header">
+        <span class="kpi-icon">⚠️</span>
+        <span class="kpi-label">{{ isLive ? 'Anomalies' : 'Total Anomalies' }}</span>
+      </div>
       <span class="kpi-value anomaly">{{ activeAnomalies }}</span>
       @if (!isLive) { <span class="kpi-subtitle">{{ activeRangeLabel() }}</span> }
     </div>
@@ -144,10 +159,16 @@
 
       <!-- Anomaly Log -->
       <div class="anomaly-log-panel">
-        <h3>Anomaly Log</h3>
+        <h3>
+          Anomaly Log
+          @if (anomalies.length > 0) {
+            <span class="anomaly-count-badge">{{ anomalies.length }}</span>
+          }
+        </h3>
         <div class="anomaly-list">
           @for (a of anomalies; track $index) {
             <div class="anomaly-entry">
+              <span class="anomaly-severity" [ngClass]="getAnomalySeverity(a.description)"></span>
               <span class="anomaly-time">{{ formatTime(a.time) }}</span>
               <span class="anomaly-pole">{{ a.poleId }}</span>
               <span class="anomaly-desc">{{ a.description }}</span>

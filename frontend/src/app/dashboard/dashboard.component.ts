@@ -408,6 +408,14 @@ export class DashboardComponent implements OnDestroy {
     return 'unhealthy';
   }
 
+  getAnomalySeverity(desc: string): string {
+    const lower = desc.toLowerCase();
+    if (lower.includes('energy spike') || lower.includes('sensor dropout') || lower.includes('null readings')) {
+      return 'critical';
+    }
+    return 'warning';
+  }
+
   activeRangeLabel(): string {
     const r = TIME_RANGES.find(t => t.key === this.activeRange);
     if (!r || r.key === 'live') return '';

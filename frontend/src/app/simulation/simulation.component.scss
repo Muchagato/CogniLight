@@ -18,13 +18,13 @@
   padding: 8px 16px;
   background: var(--cl-bg-raised);
   border-bottom: 1px solid var(--cl-border);
-  min-height: 40px;
+  min-height: 42px;
 }
 
 .sim-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .connection-dot {
@@ -32,19 +32,22 @@
   height: 8px;
   border-radius: 50%;
   background: var(--cl-red);
+  transition: background 0.3s, box-shadow 0.3s;
 
   &.on {
     background: var(--cl-green);
-    box-shadow: 0 0 6px var(--cl-green);
+    box-shadow: 0 0 8px var(--cl-green);
   }
 }
 
 .sim-time {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 18px;
+  font-size: 20px;
   color: var(--cl-amber);
   font-weight: 700;
   min-width: 50px;
+  letter-spacing: 1px;
+  text-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
 }
 
 .sim-controls {
@@ -57,11 +60,12 @@
   color: var(--cl-text-muted);
   border: 1px solid var(--cl-border);
   border-radius: var(--cl-radius-sm);
-  padding: 4px 12px;
+  padding: 5px 14px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
+  font-family: 'Outfit', sans-serif;
 
   &:hover {
     background: var(--cl-bg-active);
@@ -78,13 +82,19 @@
 
 .selected-pole {
   margin-left: auto;
-  color: var(--cl-cyan-dark);
+  color: var(--cl-cyan);
   font-size: 13px;
   font-weight: 600;
+  letter-spacing: 0.3px;
+
+  .pole-label {
+    color: var(--cl-text-faint);
+    font-weight: 400;
+  }
 }
 
 .sim-canvas {
   flex: 1;
   width: 100%;
-  cursor: pointer;
+  cursor: default;
 }

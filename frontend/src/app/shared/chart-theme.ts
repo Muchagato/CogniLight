@@ -6,21 +6,21 @@
 
 export const CT = {
   // --- Tooltip ---
-  tooltipBg: '#1e2230',
-  tooltipBorder: '#2a2e38',
+  tooltipBg: '#181c24',
+  tooltipBorder: '#252a36',
   tooltipText: '#cbd5e1',
 
   // --- Axes ---
   axisLabel: '#64748b',
-  axisLine: '#2a2e38',
-  splitLine: '#1e2230',
+  axisLine: '#252a36',
+  splitLine: '#1c2028',
 
   // --- Legend ---
   legendText: '#94a3b8',
 
   // --- Radar ---
-  radarSplitArea1: '#161921',
-  radarSplitArea2: '#1a1d23',
+  radarSplitArea1: '#14171e',
+  radarSplitArea2: '#181c24',
   radarAxisName: '#94a3b8',
 
   // --- Series Colors ---

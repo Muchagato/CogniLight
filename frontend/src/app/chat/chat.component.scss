@@ -10,19 +10,21 @@
   background: var(--cl-amber);
   border: none;
   cursor: pointer;
-  box-shadow: var(--cl-shadow-md);
-  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.25);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: center;
 
   &:hover {
     background: var(--cl-amber-hover);
-    transform: scale(1.05);
+    transform: scale(1.08);
+    box-shadow: 0 6px 24px rgba(245, 158, 11, 0.35);
   }
 
   &.open {
     background: var(--cl-text-faint);
+    box-shadow: var(--cl-shadow-md);
     &:hover {
       background: var(--cl-text-muted);
     }
@@ -46,21 +48,21 @@
   background: var(--cl-bg-raised);
   border: 1px solid var(--cl-border);
   border-radius: var(--cl-radius-lg);
-  box-shadow: var(--cl-shadow-lg);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: slideUp 0.2s ease-out;
+  animation: slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(16px) scale(0.97);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -133,12 +135,13 @@
   border-radius: 16px;
   font-size: 11px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s;
 
   &:hover {
     background: var(--cl-bg-active);
     color: var(--cl-text-primary);
-    border-color: var(--cl-bg-active);
+    border-color: var(--cl-amber);
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.1);
   }
 }
 
@@ -224,6 +227,7 @@
     font-family: inherit;
     resize: none;
     outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
 
     &:focus {
       border-color: var(--cl-amber);
@@ -245,7 +249,7 @@
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s;
 
   &:hover:not(:disabled) {
     background: var(--cl-amber-hover);

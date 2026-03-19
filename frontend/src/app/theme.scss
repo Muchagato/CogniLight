@@ -10,20 +10,20 @@
 
 :root {
   // --- Surfaces ---
-  --cl-bg-base: #0f1115;         // page / layout background
-  --cl-bg-raised: #161921;       // cards, panels, nav, toolbar
-  --cl-bg-inset: #1a1d23;        // inset areas (chat header, input area)
+  --cl-bg-base: #0c0e12;         // page / layout background
+  --cl-bg-raised: #14171e;       // cards, panels, nav, toolbar
+  --cl-bg-inset: #181c24;        // inset areas (chat header, input area)
   --cl-bg-hover: #1e2230;        // hover rows, interactive bg
   --cl-bg-active: #262b3a;       // active / pressed bg
   --cl-bg-selected: #0c2d3e;     // selected row highlight (teal-tinted)
-  --cl-bg-canvas: #0f1115;       // simulation canvas (matches bg-base)
+  --cl-bg-canvas: #0c0e12;       // simulation canvas (matches bg-base)
 
   // --- Borders ---
-  --cl-border: #2a2e38;
-  --cl-border-subtle: #1e2230;
+  --cl-border: #252a36;
+  --cl-border-subtle: #1c2028;
 
   // --- Text ---
-  --cl-text-primary: #e2e8f0;
+  --cl-text-primary: #e8ecf4;
   --cl-text-secondary: #cbd5e1;
   --cl-text-muted: #94a3b8;
   --cl-text-faint: #64748b;
@@ -34,11 +34,13 @@
   --cl-amber-hover: #d97706;
   --cl-amber-light: #fbbf24;
   --cl-amber-pale: #fef3c7;
+  --cl-amber-glow: rgba(245, 158, 11, 0.15);
 
   // --- Accent: Cyan / Teal (data / selection) ---
   --cl-cyan: #22d3ee;
   --cl-cyan-dark: #06b6d4;
   --cl-cyan-darker: #0891b2;
+  --cl-cyan-glow: rgba(34, 211, 238, 0.12);
 
   // --- Status: Green ---
   --cl-green: #22c55e;
@@ -50,6 +52,10 @@
   --cl-red-dark: #dc2626;
   --cl-red-bg: #350a0a;
 
+  // --- Status: Yellow/Warning ---
+  --cl-warning: #eab308;
+  --cl-warning-bg: #422006;
+
   // --- Data: Blue ---
   --cl-blue: #3b82f6;
   --cl-blue-light: #60a5fa;
@@ -60,12 +66,16 @@
   --cl-purple-light: #a78bfa;
 
   // --- Shadows ---
-  --cl-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --cl-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
-  --cl-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --cl-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --cl-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --cl-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --cl-shadow-glow-amber: 0 0 20px rgba(245, 158, 11, 0.08);
 
   // --- Misc ---
   --cl-radius: 10px;
   --cl-radius-sm: 6px;
   --cl-radius-lg: 14px;
+
+  // --- Stagger animation ---
+  --cl-stagger: 0;
 }

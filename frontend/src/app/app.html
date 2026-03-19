@@ -1,10 +1,9 @@
 <nav class="top-nav">
   <span class="brand">CogniLight</span>
-  <div class="view-toggle" (click)="layout.toggleSim()">
-    <span class="toggle-option" [class.active]="!layout.simCollapsed()">Map</span>
-    <span class="toggle-option" [class.active]="layout.simCollapsed()">Dashboard</span>
-    <span class="toggle-slider" [class.right]="layout.simCollapsed()"></span>
-  </div>
+  <button class="map-toggle" [class.active]="!layout.simCollapsed()" (click)="layout.toggleSim()">
+    <span class="map-toggle-icon">&#9635;</span>
+    {{ layout.simCollapsed() ? 'Show Map' : 'Hide Map' }}
+  </button>
 </nav>
 <main>
   <router-outlet />

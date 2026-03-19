@@ -45,7 +45,7 @@ import { LayoutService } from '../shared/services/layout.service';
     }
     .dash-section {
       flex: 1;
-      overflow-y: auto;
+      overflow: hidden;
       min-width: 0;
       background: var(--cl-bg-base);
     }
