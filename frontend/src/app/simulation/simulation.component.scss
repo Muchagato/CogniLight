@@ -1,8 +1,14 @@
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
 .simulation-container {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #0f172a;
+  background: var(--cl-bg-canvas);
 }
 
 .sim-toolbar {
@@ -10,8 +16,8 @@
   align-items: center;
   gap: 16px;
   padding: 8px 16px;
-  background: #1e293b;
-  border-bottom: 1px solid #334155;
+  background: var(--cl-bg-raised);
+  border-bottom: 1px solid var(--cl-border);
   min-height: 40px;
 }
 
@@ -25,18 +31,18 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #ef4444;
+  background: var(--cl-red);
 
   &.on {
-    background: #22c55e;
-    box-shadow: 0 0 6px #22c55e;
+    background: var(--cl-green);
+    box-shadow: 0 0 6px var(--cl-green);
   }
 }
 
 .sim-time {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 18px;
-  color: #f59e0b;
+  color: var(--cl-amber);
   font-weight: 700;
   min-width: 50px;
 }
@@ -47,31 +53,32 @@
 }
 
 .ctrl-btn {
-  background: #334155;
-  color: #94a3b8;
-  border: 1px solid #475569;
-  border-radius: 4px;
-  padding: 4px 10px;
+  background: var(--cl-bg-hover);
+  color: var(--cl-text-muted);
+  border: 1px solid var(--cl-border);
+  border-radius: var(--cl-radius-sm);
+  padding: 4px 12px;
   font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
 
   &:hover {
-    background: #475569;
-    color: #e2e8f0;
+    background: var(--cl-bg-active);
+    color: var(--cl-text-primary);
   }
 
   &.active {
-    background: #f59e0b;
-    color: #0f172a;
-    border-color: #f59e0b;
+    background: var(--cl-amber);
+    color: #000000;
+    border-color: var(--cl-amber);
     font-weight: 700;
   }
 }
 
 .selected-pole {
   margin-left: auto;
-  color: #06b6d4;
+  color: var(--cl-cyan-dark);
   font-size: 13px;
   font-weight: 600;
 }

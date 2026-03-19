@@ -14,40 +14,40 @@ Three-layer architecture: animated street simulation, real-time telemetry dashbo
 
 ```
 ┌─────────────────────────────────────────────────┐
-│                 Angular Frontend                 │
+│                 Angular Frontend                │
 │  ┌──────────┐  ┌──────────────┐  ┌───────────┐  │
 │  │ Street   │  │  Telemetry   │  │ AI Chat   │  │
 │  │ Sim View │  │  Dashboard   │  │ (RAG UI)  │  │
 │  └──────────┘  └──────────────┘  └───────────┘  │
-│        ↕ WebSocket       ↕ REST        ↕ REST    │
+│        ↕ WebSocket       ↕ REST        ↕ REST   │
 ├─────────────────────────────────────────────────┤
-│           .NET 10 Backend (C#)                    │
+│           .NET 10 Backend (C#)                  │
 │  ┌──────────────┐  ┌────────────────────────┐   │
 │  │ Simulation   │  │ Telemetry API          │   │
 │  │ Engine       │  │ (REST + WebSocket)     │   │
 │  │ (time-step)  │  │                        │   │
 │  └──────────────┘  └────────────────────────┘   │
-│        ↕ writes              ↕ reads             │
+│        ↕ writes              ↕ reads            │
 │  ┌──────────────────────────────────────────┐   │
-│  │         SQLite (telemetry storage)        │   │
+│  │         SQLite (telemetry storage)       │   │
 │  └──────────────────────────────────────────┘   │
-│                      ↕ reads                     │
+│                      ↕ reads                    │
 ├─────────────────────────────────────────────────┤
-│          Python AI Service (FastAPI)             │
+│          Python AI Service (FastAPI)            │
 │  ┌──────────────┐  ┌────────────────────────┐   │
-│  │ RAG Pipeline  │  │ Anomaly Detection     │   │
-│  │ (FAISS +     │  │ (rule-based + LLM     │   │
+│  │ RAG Pipeline │  │ Anomaly Detection      │   │
+│  │ (FAISS +     │  │ (rule-based + LLM      │   │
 │  │  embeddings) │  │  summarization)        │   │
 │  └──────────────┘  └────────────────────────┘   │
 └─────────────────────────────────────────────────┘
 ```
 
-## Tech Stack (MUST match exactly)
+## Tech Stack
 
-- **Frontend:** Angular 21 with TypeScript, standalone components, Angular Material or custom components
-- **Backend:** C# / .NET 8 minimal API, Entity Framework Core with SQLite, SignalR for WebSocket
+- **Frontend:** Angular 21 with TypeScript, standalone components, HTML5 Canvas, ECharts (ngx-echarts), SignalR client
+- **Backend:** C# / .NET 10 minimal API, Entity Framework Core with SQLite, SignalR for WebSocket
 - **AI Service:** Python 3.11+, FastAPI, sentence-transformers for embeddings, FAISS for vector search
-- **LLM:** Use OpenAI-compatible API (user will configure key) OR mock responses for demo mode
+- **LLM:** OpenAI-compatible API (user will configure key) OR rule-based demo mode
 - **Containerization:** Docker Compose to run all three services
 
 ## Directory Structure
@@ -60,11 +60,27 @@ cognilight/
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── simulation/      # Street view component (HTML5 Canvas)
+│   │   │   │   ├── renderer/    # Modular canvas renderer
+│   │   │   │   │   ├── theme.ts             # Canvas color constants (RT)
+│   │   │   │   │   ├── world-layout.ts      # Roads, buildings, poles definitions
+│   │   │   │   │   ├── entity-manager.ts    # Entity lifecycle (spawn/fade)
+│   │   │   │   │   ├── iso-projection.ts    # World-to-screen projection
+│   │   │   │   │   └── layers/              # Draw layers (ground, buildings, entities, poles, overlays)
+│   │   │   │   ├── simulation.renderer.ts   # Orchestrator
+│   │   │   │   ├── simulation.component.ts
+│   │   │   │   ├── simulation.component.html
+│   │   │   │   └── simulation.component.scss
 │   │   │   ├── dashboard/       # Telemetry dashboard component
-│   │   │   ├── chat/            # AI chat component
-│   │   │   ├── shared/          # Shared models, services
-│   │   │   └── app.component.ts
-│   │   └── ...
+│   │   │   ├── chat/            # AI chat component (floating panel)
+│   │   │   ├── home/            # Layout: sim + dashboard side-by-side
+│   │   │   ├── shared/
+│   │   │   │   ├── models/      # TelemetryReading model
+│   │   │   │   ├── services/    # TelemetryService (SignalR), LayoutService
+│   │   │   │   └── chart-theme.ts  # ECharts color constants (CT)
+│   │   │   ├── theme.scss       # CSS custom properties (single source of truth)
+│   │   │   ├── app.ts / app.html / app.scss
+│   │   │   └── app.routes.ts
+│   │   └── styles.scss
 │   ├── angular.json
 │   └── Dockerfile
 ├── backend/                     # .NET 10 API
@@ -72,11 +88,10 @@ cognilight/
 │   │   ├── Program.cs
 │   │   ├── Models/
 │   │   ├── Services/
-│   │   │   ├── SimulationEngine.cs
+│   │   │   ├── SimulationEngine.cs  # IHostedService with per-pole zone activity
 │   │   │   └── TelemetryService.cs
 │   │   ├── Hubs/
 │   │   │   └── TelemetryHub.cs  # SignalR hub
-│   │   ├── Controllers/
 │   │   └── Data/
 │   │       └── AppDbContext.cs
 │   ├── CogniLight.Api.csproj
@@ -86,7 +101,7 @@ cognilight/
 │   ├── rag/
 │   │   ├── embeddings.py
 │   │   ├── retriever.py
-│   │   └── chain.py
+│   │   └── chain.py             # RAG with pole zone context
 │   ├── anomaly/
 │   │   └── detector.py
 │   ├── requirements.txt
@@ -106,9 +121,10 @@ cognilight/
 - Time controls: play/pause, speed multiplier (1x, 2x, 5x, 10x), time-of-day display
 
 ### Entity Behavior
-- Pedestrians: random walks on sidewalks, clustering near buildings, reduced at night
-- Vehicles: follow road lanes, stop at intersection, density follows rush-hour patterns
-- Cyclists: bike lane movement, moderate speed between pedestrians and cars
+- Each pole has a ZoneType (Office, Retail, Park, School, Mall, Apt, Cafe, Gym, Residence, Mixed, Tower, Hotel) that determines its activity profile
+- Activity multipliers vary by time of day (e.g., Office: busy 8-18h, dead at night; Hotel: steady all day)
+- Entities spawn near poles and fade in/out based on backend telemetry counts
+- Pedestrians appear on sidewalks, vehicles/cyclists on road segments within the pole's zone radius
 
 ### Per-Pole Telemetry (generated each simulation tick, ~1 second):
 - `pole_id` (string): "POLE-01" through "POLE-12"
@@ -125,16 +141,16 @@ cognilight/
 - `light_level_pct` (float): 0-100%, adaptive dimming output
 - `anomaly_flag` (bool): occasional random anomalies (flickering, sensor malfunction)
 
-### Anomaly Scenarios (randomly injected):
-- Unusual pedestrian cluster at odd hours (potential safety event)
-- Sudden energy spike on a pole (malfunction)
-- Sensor dropout (null readings)
-- Air quality spike uncorrelated with traffic (external event)
+### Anomaly Scenarios (~0.3% chance per pole per tick, context-aware):
+- Pedestrian cluster — only flagged when the zone should be quiet (e.g., school at night)
+- Sudden energy spike — hardware malfunction, can happen anytime
+- Sensor dropout — null readings, can happen anytime
+- Air quality spike — flagged when uncorrelated with traffic density
 
 ## Dashboard Design
 
 ### Layout
-Full-width below the street simulation. Use a grid of cards/panels:
+Side-by-side with the street simulation (sim left 45%, dashboard right 55%). The sim panel is collapsible via a Map/Dashboard toggle in the nav bar. Dashboard uses a grid of cards/panels:
 
 **Row 1 — Aggregate KPIs:**
 - Total energy consumption (all poles, real-time)
@@ -159,7 +175,7 @@ Use a well-supported Angular charting library: ngx-charts, Chart.js with ng2-cha
 ## AI Chat Panel
 
 ### UI
-- Collapsible side panel or bottom drawer
+- Floating action button (bottom-right) opens a chat panel
 - Chat message interface with user/assistant bubbles
 - Suggested prompts: "Summarize the last hour", "Which poles are consuming the most energy?", "Any anomalies detected?", "Compare traffic between morning and evening"
 
@@ -175,16 +191,21 @@ Use a well-supported Angular charting library: ngx-charts, Chart.js with ng2-cha
 - If no LLM API key is configured, use pre-canned responses that demonstrate the interface
 - Alternatively, use a small local model or rule-based response generation
 
-## Visual Design Direction
+## Visual Design
 
-**Aesthetic: Industrial/utilitarian meets data-rich dashboard — think control room UI.**
+**Aesthetic: Industrial/utilitarian control room UI — dark theme throughout.**
 - Dark theme (charcoal/navy background, NOT pure black)
-- Accent color: warm amber/orange (#F59E0B) — evokes street lighting
-- Secondary accent: cool teal (#06B6D4) — for data/digital elements
-- Monospace font for data values, clean sans-serif for labels
-- Subtle grid lines, no heavy borders
-- Glow effects on active poles in the street view
+- Accent color: warm amber (#F59E0B) — evokes street lighting
+- Secondary accent: cool teal/cyan (#06B6D4, #22d3ee) — for data/digital elements
 - Status indicators: green (normal), amber (warning), red (anomaly)
+- Glow effects on active poles at night
+
+**Theming is centralized across three files:**
+1. `frontend/src/app/theme.scss` — CSS custom properties for all SCSS-based components (single source of truth)
+2. `frontend/src/app/simulation/renderer/theme.ts` — TypeScript `RT` const for canvas renderer (can't read CSS vars)
+3. `frontend/src/app/shared/chart-theme.ts` — TypeScript `CT` const + helpers for ECharts options (JS objects, not CSS)
+
+To change the theme, edit these three files. All component styles reference CSS variables (`var(--cl-*)`).
 
 ## Development Phases
 

@@ -22,6 +22,8 @@ services:
     build: ./ai-service
     ports:
       - "8000:8000"
+    depends_on:
+      - backend
     environment:
       - DATABASE_PATH=/data/cognilight.db
       - LLM_API_KEY=${LLM_API_KEY:-}

@@ -1,4 +1,4 @@
-import { Injectable, OnDestroy } from '@angular/core';
+import { inject, Injectable, NgZone, OnDestroy } from '@angular/core';
 import { Subject, BehaviorSubject } from 'rxjs';
 import * as signalR from '@microsoft/signalr';
 import { TelemetryReading, TelemetryUpdate } from '../models/telemetry.model';
@@ -26,6 +26,7 @@ const MAX_HISTORY = 120;
 
 @Injectable({ providedIn: 'root' })
 export class TelemetryService implements OnDestroy {
+  private readonly zone = inject(NgZone);
   private hubConnection: signalR.HubConnection;
 
   private readonly readingsSubject = new BehaviorSubject<TelemetryReading[]>([]);
@@ -40,6 +41,9 @@ export class TelemetryService implements OnDestroy {
   readonly history$ = this.historySubject.asObservable();
   readonly anomalies$ = this.anomaliesSubject.asObservable();
 
+  private readonly selectedPoleSubject = new BehaviorSubject<string | null>(null);
+  readonly selectedPoleId$ = this.selectedPoleSubject.asObservable();
+
   private readonly destroy$ = new Subject<void>();
   private history: AggregateSnapshot[] = [];
   private anomalyLog: AnomalyEvent[] = [];
@@ -51,13 +55,15 @@ export class TelemetryService implements OnDestroy {
       .build();
 
     this.hubConnection.on('TelemetryUpdate', (data: TelemetryUpdate) => {
-      this.readingsSubject.next(data.readings);
-      this.simulationTimeSubject.next(data.simulationTime);
-      this.recordSnapshot(data);
+      this.zone.run(() => {
+        this.readingsSubject.next(data.readings);
+        this.simulationTimeSubject.next(data.simulationTime);
+        this.recordSnapshot(data);
+      });
     });
 
-    this.hubConnection.onclose(() => this.connectionStatusSubject.next(false));
-    this.hubConnection.onreconnected(() => this.connectionStatusSubject.next(true));
+    this.hubConnection.onclose(() => this.zone.run(() => this.connectionStatusSubject.next(false)));
+    this.hubConnection.onreconnected(() => this.zone.run(() => this.connectionStatusSubject.next(true)));
 
     this.startConnection();
   }
@@ -104,11 +110,11 @@ export class TelemetryService implements OnDestroy {
     }
   }
 
-  private readonly apiBase = 'http://localhost:5000/api';
-
-  async setSpeed(multiplier: number): Promise<void> {
-    await fetch(`${this.apiBase}/simulation/speed/${multiplier}`, { method: 'POST' });
+  selectPole(poleId: string | null): void {
+    this.selectedPoleSubject.next(poleId);
   }
+
+  private readonly apiBase = 'http://localhost:5000/api';
 
   async pause(): Promise<void> {
     await fetch(`${this.apiBase}/simulation/pause`, { method: 'POST' });

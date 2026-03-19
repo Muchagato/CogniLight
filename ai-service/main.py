@@ -25,6 +25,22 @@ retriever = Retriever()
 _latest_anomalies: list[AnomalyReport] = []
 _last_ingested_id: int = 0
 
+# Pole-to-zone mapping — mirrors backend SimulationEngine.PoleZones
+POLE_ZONES: dict[str, str] = {
+    "POLE-01": "Office",
+    "POLE-02": "Retail",
+    "POLE-03": "Park",
+    "POLE-04": "School",
+    "POLE-05": "Mall",
+    "POLE-06": "Apartment",
+    "POLE-07": "Gym",
+    "POLE-08": "Residential",
+    "POLE-09": "Cafe",
+    "POLE-10": "Mixed-use",
+    "POLE-11": "Tower",
+    "POLE-12": "Hotel",
+}
+
 
 def _get_engine():
     return create_engine(f"sqlite:///{DB_PATH}", echo=False)
@@ -73,8 +89,7 @@ def _ingest_new_readings() -> int:
 
             retriever.add_chunks(chunks)
             return len(chunks)
-    except Exception as e:
-        print(f"Ingest error: {e}")
+    except Exception:
         return 0
 
 
@@ -93,17 +108,17 @@ def _summarize_group(timestamp: str, readings: list[dict[str, Any]]) -> str:
         descs = [r["AnomalyDescription"] for r in anomalies if r["AnomalyDescription"]]
         anomaly_text = " Anomalies: " + "; ".join(descs) + "."
 
-    parts: list[str] = []
-    # Per-pole highlights for noteworthy readings
+    # Per-pole details with zone context
+    pole_parts: list[str] = []
     for r in readings:
-        if r["EnergyWatts"] > 200 or r["PedestrianCount"] > 15 or r["AnomalyFlag"]:
-            parts.append(
-                f"{r['PoleId']}: {r['EnergyWatts']:.0f}W, "
-                f"{r['PedestrianCount']} ped, {r['VehicleCount']} veh, "
-                f"AQI {r['AirQualityAqi']}"
-            )
+        zone = POLE_ZONES.get(r["PoleId"], "Unknown")
+        pole_parts.append(
+            f"{r['PoleId']} ({zone}): {r['EnergyWatts']:.0f}W, "
+            f"{r['PedestrianCount']} ped, {r['VehicleCount']} veh, "
+            f"{r['CyclistCount']} cyc, AQI {r['AirQualityAqi']}"
+        )
 
-    pole_detail = (" Noteworthy: " + "; ".join(parts) + ".") if parts else ""
+    pole_detail = " Poles: " + "; ".join(pole_parts) + "."
 
     return (
         f"At {timestamp}: network total {total_energy:.0f}W, "
@@ -116,9 +131,7 @@ def _summarize_group(timestamp: str, readings: list[dict[str, Any]]) -> str:
 async def _ingest_loop():
     """Background task that periodically ingests new readings."""
     while True:
-        count = _ingest_new_readings()
-        if count > 0:
-            print(f"Ingested {count} chunks. FAISS index size: {retriever.size}")
+        _ingest_new_readings()
         await asyncio.sleep(INGEST_INTERVAL)
 
 

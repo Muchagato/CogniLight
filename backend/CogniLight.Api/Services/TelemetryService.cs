@@ -19,6 +19,15 @@ public class TelemetryService
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.TelemetryReadings.AddRange(readings);
         await db.SaveChangesAsync();
+
+        // Prune data older than 3 days (run every ~100 ticks to avoid per-tick overhead)
+        if (Random.Shared.Next(100) == 0)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-3);
+            await db.TelemetryReadings
+                .Where(r => r.Timestamp < cutoff)
+                .ExecuteDeleteAsync();
+        }
     }
 
     public async Task<List<TelemetryReading>> GetLatestReadingsAsync()

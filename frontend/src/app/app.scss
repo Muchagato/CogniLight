@@ -1,47 +1,64 @@
 .top-nav {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 16px;
   padding: 0 24px;
   height: 48px;
-  background: #0f172a;
-  border-bottom: 1px solid #1e293b;
+  background: var(--cl-bg-raised);
+  border-bottom: 1px solid var(--cl-border);
+  box-shadow: var(--cl-shadow-sm);
 }
 
 .brand {
   font-size: 18px;
   font-weight: 700;
-  color: #f59e0b;
+  color: var(--cl-amber);
   letter-spacing: 1px;
-  font-family: monospace;
+  font-family: 'Inter', sans-serif;
   text-decoration: none;
+}
+
+.view-toggle {
+  position: relative;
+  display: flex;
+  background: var(--cl-bg-inset);
+  border: 1px solid var(--cl-border);
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  overflow: hidden;
+}
+
+.toggle-option {
+  position: relative;
+  z-index: 1;
+  padding: 4px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cl-text-faint);
+  transition: color 0.2s;
+
+  &.active {
+    color: var(--cl-text-primary);
+  }
+}
+
+.toggle-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: calc(50% - 2px);
+  height: calc(100% - 4px);
+  background: var(--cl-bg-active);
+  border-radius: 4px;
+  transition: left 0.2s ease;
+
+  &.right {
+    left: 50%;
+  }
 }
 
 main {
   height: calc(100vh - 48px);
   overflow: hidden;
 }
-
-.nav-links {
-  display: flex;
-  gap: 16px;
-
-  a {
-    color: #94a3b8;
-    text-decoration: none;
-    font-size: 14px;
-    padding: 4px 12px;
-    border-radius: 4px;
-    transition: color 0.2s, background 0.2s;
-
-    &:hover {
-      color: #e2e8f0;
-    }
-
-    &.active {
-      color: #f59e0b;
-      background: rgba(245, 158, 11, 0.1);
-    }
-  }
-}
-

@@ -33,11 +33,13 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Ensure database is created
+// Ensure database is created, prune data older than 3 days
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+    var cutoff = DateTime.UtcNow.AddDays(-3);
+    db.TelemetryReadings.Where(r => r.Timestamp < cutoff).ExecuteDelete();
 }
 
 if (app.Environment.IsDevelopment())
@@ -62,18 +64,11 @@ api.MapGet("/telemetry/anomalies", async (TelemetryService svc) =>
 api.MapGet("/simulation/status", (SimulationEngine engine) =>
     new
     {
-        time = engine.GetSimulationTime().ToString("o"),
+        time = DateTime.UtcNow.ToString("o"),
         running = engine.IsRunning,
-        speed = engine.SpeedMultiplier
     });
 
 api.MapGet("/simulation/poles", () => SimulationEngine.GetPoleLayout());
-
-api.MapPost("/simulation/speed/{multiplier:int}", (int multiplier, SimulationEngine engine) =>
-{
-    engine.SetSpeed(multiplier);
-    return Results.Ok(new { speed = multiplier });
-});
 
 api.MapPost("/simulation/pause", (SimulationEngine engine) =>
 {

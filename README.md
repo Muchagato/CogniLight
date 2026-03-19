@@ -44,7 +44,7 @@ npm install
 npx ng serve
 ```
 
-Open `http://localhost:4200`. The Overview page shows the street simulation (top) and telemetry dashboard (bottom).
+Open `http://localhost:4200`. The layout shows the street simulation (left) and telemetry dashboard (right) side by side, with a toggle in the nav bar to show/hide the map.
 
 ### 3. AI Service (optional)
 
@@ -77,9 +77,10 @@ Services: frontend (:4200), backend (:5000), ai-service (:8000).
 - Top-down 2D canvas rendering of a city block with two streets and a crossroad
 - 12 light poles with sensor radius visualization and adaptive glow effects
 - Animated entities (pedestrians, vehicles, cyclists) driven by real-time counts
-- Time-of-day cycle with lighting effects, vehicle headlights, building windows
-- Play/pause and speed controls (1x, 2x, 5x, 10x)
-- Click-to-select pole interaction
+- Per-pole zone-based activity profiles (Office, Retail, Park, School, Mall, Apartment, Gym, Residential, Cafe, Mixed, Tower, Hotel) with realistic time-of-day curves
+- Time-of-day cycle with lighting effects, vehicle headlights
+- Play/pause controls, click-to-select pole interaction
+- Collapsible via nav bar toggle to give the dashboard full width
 
 ### Telemetry Dashboard
 - KPI summary cards: total energy, pedestrian/vehicle counts, AQI, anomaly count
@@ -89,6 +90,7 @@ Services: frontend (:4200), backend (:5000), ai-service (:8000).
 
 ### AI Chat
 - RAG pipeline: telemetry → text summaries → FAISS embeddings → context retrieval
+- Pole zone context: AI knows each pole's nearby building type and expected activity patterns
 - Natural language queries about energy, traffic, anomalies, trends
 - Demo mode with rule-based responses when no LLM API key is configured
 - Suggested prompts for common queries
@@ -96,11 +98,15 @@ Services: frontend (:4200), backend (:5000), ai-service (:8000).
 ### Per-Pole Telemetry
 Each pole generates every simulation tick:
 - Energy consumption (50-250W, adaptive dimming)
-- Pedestrian, vehicle, cyclist counts
+- Pedestrian, vehicle, cyclist counts (zone-aware, time-of-day driven)
 - Ambient light (solar curve), temperature, humidity
 - Air quality index, noise level
 - Light output level (adaptive)
-- Anomaly flags (~3% injection rate)
+- Context-aware anomaly injection (~0.3% per pole per tick)
+
+### Theming
+- Dark theme (charcoal/navy) with amber and cyan accents
+- Centralized color definitions: CSS custom properties (`theme.scss`), canvas renderer constants (`renderer/theme.ts`), ECharts constants (`shared/chart-theme.ts`)
 
 ## Tech Stack
 

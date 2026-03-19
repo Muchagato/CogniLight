@@ -1,4 +1,4 @@
-import { Component, inject, OnDestroy } from '@angular/core';
+import { ChangeDetectorRef, Component, inject, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subject, takeUntil } from 'rxjs';
 import { NgxEchartsDirective } from 'ngx-echarts';
@@ -9,6 +9,7 @@ import {
   AnomalyEvent,
 } from '../shared/services/telemetry.service';
 import { TelemetryReading } from '../shared/models/telemetry.model';
+import { CT, TOOLTIP_STYLE, AXIS_LABEL, AXIS_LINE, SPLIT_LINE } from '../shared/chart-theme';
 
 @Component({
   selector: 'app-dashboard',
@@ -19,6 +20,7 @@ import { TelemetryReading } from '../shared/models/telemetry.model';
 })
 export class DashboardComponent implements OnDestroy {
   private readonly telemetry = inject(TelemetryService);
+  private readonly cdr = inject(ChangeDetectorRef);
   private readonly destroy$ = new Subject<void>();
 
   readings: TelemetryReading[] = [];
@@ -34,11 +36,15 @@ export class DashboardComponent implements OnDestroy {
   avgAqi = 0;
   activeAnomalies = 0;
 
-  // Chart options
-  energyChartOpts: EChartsOption = {};
-  trafficChartOpts: EChartsOption = {};
-  envChartOpts: EChartsOption = {};
-  poleChartOpts: EChartsOption = {};
+  // ECharts instances — we call setOption directly
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private energyChart: any = null;
+  private trafficChart: any = null;
+  private envChart: any = null;
+  private poleChart: any = null;
+
+  // Minimal init options (empty charts need at least {})
+  readonly initOpts: EChartsOption = {};
 
   private history: AggregateSnapshot[] = [];
 
@@ -48,15 +54,22 @@ export class DashboardComponent implements OnDestroy {
       .subscribe(r => {
         this.readings = r;
         this.updateKpis(r);
+        this.cdr.detectChanges();
       });
 
     this.telemetry.simulationTime$
       .pipe(takeUntil(this.destroy$))
-      .subscribe(t => this.simulationTime = t);
+      .subscribe(t => {
+        this.simulationTime = t;
+        this.cdr.detectChanges();
+      });
 
     this.telemetry.connected$
       .pipe(takeUntil(this.destroy$))
-      .subscribe(c => this.connected = c);
+      .subscribe(c => {
+        this.connected = c;
+        this.cdr.detectChanges();
+      });
 
     this.telemetry.history$
       .pipe(takeUntil(this.destroy$))
@@ -67,7 +80,38 @@ export class DashboardComponent implements OnDestroy {
 
     this.telemetry.anomalies$
       .pipe(takeUntil(this.destroy$))
-      .subscribe(a => this.anomalies = a);
+      .subscribe(a => {
+        this.anomalies = a;
+        this.cdr.detectChanges();
+      });
+
+    this.telemetry.selectedPoleId$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(id => {
+        this.selectedPoleId = id;
+        this.updatePoleChart();
+        this.cdr.detectChanges();
+      });
+  }
+
+  onEnergyChartInit(chart: unknown): void {
+    this.energyChart = chart;
+    setTimeout(() => { this.energyChart?.resize(); this.updateCharts(); });
+  }
+
+  onTrafficChartInit(chart: unknown): void {
+    this.trafficChart = chart;
+    setTimeout(() => { this.trafficChart?.resize(); this.updateCharts(); });
+  }
+
+  onEnvChartInit(chart: unknown): void {
+    this.envChart = chart;
+    setTimeout(() => { this.envChart?.resize(); this.updateCharts(); });
+  }
+
+  onPoleChartInit(chart: unknown): void {
+    this.poleChart = chart;
+    setTimeout(() => { this.poleChart?.resize(); this.updatePoleChart(); });
   }
 
   private updateKpis(r: TelemetryReading[]): void {
@@ -79,14 +123,14 @@ export class DashboardComponent implements OnDestroy {
   }
 
   selectPole(poleId: string): void {
-    this.selectedPoleId = this.selectedPoleId === poleId ? null : poleId;
-    this.updatePoleChart();
+    const newId = this.selectedPoleId === poleId ? null : poleId;
+    this.telemetry.selectPole(newId);
   }
 
   formatTime(iso: string): string {
     if (!iso) return '';
     const d = new Date(iso);
-    return d.toISOString().substring(11, 16);
+    return d.toISOString().substring(11, 19); // HH:MM:SS
   }
 
   aqiClass(aqi: number): string {
@@ -95,73 +139,63 @@ export class DashboardComponent implements OnDestroy {
     return 'unhealthy';
   }
 
-  private chartTheme = {
-    textColor: '#94a3b8',
-    gridBg: 'transparent',
-    lineColors: ['#f59e0b', '#06b6d4', '#a78bfa', '#22c55e', '#ef4444'],
-  };
-
   private updateCharts(): void {
     if (this.history.length < 2) return;
     const times = this.history.map(h => this.formatTime(h.time));
 
-    this.energyChartOpts = {
+    this.energyChart?.setOption({
       animation: false,
       grid: { top: 30, right: 16, bottom: 24, left: 50 },
-      tooltip: { trigger: 'axis', backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#e2e8f0' } },
-      xAxis: { type: 'category', data: times, axisLabel: { color: '#64748b', fontSize: 10 }, axisLine: { lineStyle: { color: '#334155' } } },
-      yAxis: { type: 'value', name: 'Watts', nameTextStyle: { color: '#64748b' }, axisLabel: { color: '#64748b', fontSize: 10 }, splitLine: { lineStyle: { color: '#1e293b' } } },
+      tooltip: { trigger: 'axis', ...TOOLTIP_STYLE },
+      xAxis: { type: 'category', boundaryGap: false, data: times, axisLabel: { ...AXIS_LABEL, interval: 'auto' }, axisLine: AXIS_LINE },
+      yAxis: { type: 'value', name: 'Watts', nameTextStyle: { color: CT.axisLabel }, axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
       series: [{
         type: 'line',
         data: this.history.map(h => Math.round(h.totalEnergy)),
         smooth: true,
         symbol: 'none',
-        lineStyle: { color: '#f59e0b', width: 2 },
-        areaStyle: { color: 'rgba(245,158,11,0.1)' },
+        lineStyle: { color: CT.energy, width: 2 },
+        areaStyle: { color: CT.energyArea },
       }],
-    };
+    });
 
-    this.trafficChartOpts = {
+    this.trafficChart?.setOption({
       animation: false,
       grid: { top: 30, right: 16, bottom: 24, left: 50 },
-      tooltip: { trigger: 'axis', backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#e2e8f0' } },
-      legend: { data: ['Pedestrians', 'Vehicles', 'Cyclists'], textStyle: { color: '#94a3b8', fontSize: 10 }, top: 0 },
-      xAxis: { type: 'category', data: times, axisLabel: { color: '#64748b', fontSize: 10 }, axisLine: { lineStyle: { color: '#334155' } } },
-      yAxis: { type: 'value', axisLabel: { color: '#64748b', fontSize: 10 }, splitLine: { lineStyle: { color: '#1e293b' } } },
+      tooltip: { trigger: 'axis', ...TOOLTIP_STYLE },
+      legend: { data: ['Pedestrians', 'Vehicles', 'Cyclists'], textStyle: { color: CT.legendText, fontSize: 10 }, top: 0 },
+      xAxis: { type: 'category', boundaryGap: false, data: times, axisLabel: { ...AXIS_LABEL, interval: 'auto' }, axisLine: AXIS_LINE },
+      yAxis: { type: 'value', axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
       series: [
-        { name: 'Pedestrians', type: 'line', stack: 'traffic', data: this.history.map(h => h.totalPedestrians), smooth: true, symbol: 'none', areaStyle: { opacity: 0.3 }, lineStyle: { color: '#06b6d4' }, itemStyle: { color: '#06b6d4' } },
-        { name: 'Vehicles', type: 'line', stack: 'traffic', data: this.history.map(h => h.totalVehicles), smooth: true, symbol: 'none', areaStyle: { opacity: 0.3 }, lineStyle: { color: '#f59e0b' }, itemStyle: { color: '#f59e0b' } },
-        { name: 'Cyclists', type: 'line', stack: 'traffic', data: this.history.map(h => h.totalCyclists), smooth: true, symbol: 'none', areaStyle: { opacity: 0.3 }, lineStyle: { color: '#a78bfa' }, itemStyle: { color: '#a78bfa' } },
+        { name: 'Pedestrians', type: 'line', stack: 'traffic', data: this.history.map(h => h.totalPedestrians), smooth: true, symbol: 'none', areaStyle: { opacity: 0.15 }, lineStyle: { color: CT.pedestrian }, itemStyle: { color: CT.pedestrian } },
+        { name: 'Vehicles', type: 'line', stack: 'traffic', data: this.history.map(h => h.totalVehicles), smooth: true, symbol: 'none', areaStyle: { opacity: 0.15 }, lineStyle: { color: CT.vehicle }, itemStyle: { color: CT.vehicle } },
+        { name: 'Cyclists', type: 'line', stack: 'traffic', data: this.history.map(h => h.totalCyclists), smooth: true, symbol: 'none', areaStyle: { opacity: 0.15 }, lineStyle: { color: CT.cyclist }, itemStyle: { color: CT.cyclist } },
       ],
-    };
+    });
 
-    this.envChartOpts = {
+    this.envChart?.setOption({
       animation: false,
       grid: { top: 30, right: 60, bottom: 24, left: 50 },
-      tooltip: { trigger: 'axis', backgroundColor: '#1e293b', borderColor: '#334155', textStyle: { color: '#e2e8f0' } },
-      legend: { data: ['Temp', 'Humidity', 'AQI'], textStyle: { color: '#94a3b8', fontSize: 10 }, top: 0 },
-      xAxis: { type: 'category', data: times, axisLabel: { color: '#64748b', fontSize: 10 }, axisLine: { lineStyle: { color: '#334155' } } },
+      tooltip: { trigger: 'axis', ...TOOLTIP_STYLE },
+      legend: { data: ['Temp', 'Humidity', 'AQI'], textStyle: { color: CT.legendText, fontSize: 10 }, top: 0 },
+      xAxis: { type: 'category', boundaryGap: false, data: times, axisLabel: { ...AXIS_LABEL, interval: 'auto' }, axisLine: AXIS_LINE },
       yAxis: [
-        { type: 'value', name: 'Temp/Humid', axisLabel: { color: '#64748b', fontSize: 10 }, splitLine: { lineStyle: { color: '#1e293b' } }, nameTextStyle: { color: '#64748b' } },
-        { type: 'value', name: 'AQI', axisLabel: { color: '#64748b', fontSize: 10 }, splitLine: { show: false }, nameTextStyle: { color: '#64748b' } },
+        { type: 'value', name: 'Temp/Humid', axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, nameTextStyle: { color: CT.axisLabel } },
+        { type: 'value', name: 'AQI', axisLabel: AXIS_LABEL, splitLine: { show: false }, nameTextStyle: { color: CT.axisLabel } },
       ],
       series: [
-        { name: 'Temp', type: 'line', data: this.history.map(h => h.avgTemperature), smooth: true, symbol: 'none', lineStyle: { color: '#ef4444' }, itemStyle: { color: '#ef4444' } },
-        { name: 'Humidity', type: 'line', data: this.history.map(h => h.avgHumidity), smooth: true, symbol: 'none', lineStyle: { color: '#3b82f6' }, itemStyle: { color: '#3b82f6' } },
-        { name: 'AQI', type: 'line', yAxisIndex: 1, data: this.history.map(h => h.avgAqi), smooth: true, symbol: 'none', lineStyle: { color: '#22c55e' }, itemStyle: { color: '#22c55e' } },
+        { name: 'Temp', type: 'line', data: this.history.map(h => h.avgTemperature), smooth: true, symbol: 'none', lineStyle: { color: CT.temperature }, itemStyle: { color: CT.temperature } },
+        { name: 'Humidity', type: 'line', data: this.history.map(h => h.avgHumidity), smooth: true, symbol: 'none', lineStyle: { color: CT.humidity }, itemStyle: { color: CT.humidity } },
+        { name: 'AQI', type: 'line', yAxisIndex: 1, data: this.history.map(h => h.avgAqi), smooth: true, symbol: 'none', lineStyle: { color: CT.aqi }, itemStyle: { color: CT.aqi } },
       ],
-    };
+    });
 
     this.updatePoleChart();
   }
 
   private updatePoleChart(): void {
-    if (!this.selectedPoleId || this.history.length < 2) {
-      this.poleChartOpts = {};
-      return;
-    }
+    if (!this.selectedPoleId || this.history.length < 2) return;
 
-    // For per-pole chart, use latest readings only (we don't store per-pole history in frontend)
     const pole = this.readings.find(r => r.poleId === this.selectedPoleId);
     if (!pole) return;
 
@@ -174,23 +208,23 @@ export class DashboardComponent implements OnDestroy {
       pole.temperatureC,
     ];
 
-    this.poleChartOpts = {
+    this.poleChart?.setOption({
       animation: false,
       radar: {
         indicator: metrics.map(m => ({ name: m, max: m === 'Energy' ? 250 : m === 'AQI' ? 150 : 100 })),
-        axisName: { color: '#94a3b8' },
-        splitArea: { areaStyle: { color: ['#1e293b', '#0f172a'] } },
-        splitLine: { lineStyle: { color: '#334155' } },
-        axisLine: { lineStyle: { color: '#334155' } },
+        axisName: { color: CT.radarAxisName },
+        splitArea: { areaStyle: { color: [CT.radarSplitArea1, CT.radarSplitArea2] } },
+        splitLine: { lineStyle: { color: CT.axisLine } },
+        axisLine: { lineStyle: { color: CT.axisLine } },
       },
       series: [{
         type: 'radar',
         data: [{ value: values, name: this.selectedPoleId }],
-        lineStyle: { color: '#06b6d4' },
-        areaStyle: { color: 'rgba(6,182,212,0.15)' },
-        itemStyle: { color: '#06b6d4' },
+        lineStyle: { color: CT.pedestrian },
+        areaStyle: { color: CT.pedestrianArea },
+        itemStyle: { color: CT.pedestrian },
       }],
-    };
+    });
   }
 
   ngOnDestroy(): void {

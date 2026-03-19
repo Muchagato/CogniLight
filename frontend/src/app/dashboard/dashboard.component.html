@@ -27,15 +27,15 @@
   <div class="charts-row">
     <div class="chart-panel">
       <h3>Energy Consumption</h3>
-      <div echarts [options]="energyChartOpts" class="chart"></div>
+      <div echarts [options]="initOpts" [autoResize]="true" (chartInit)="onEnergyChartInit($event)" class="chart"></div>
     </div>
     <div class="chart-panel">
       <h3>Traffic Density</h3>
-      <div echarts [options]="trafficChartOpts" class="chart"></div>
+      <div echarts [options]="initOpts" [autoResize]="true" (chartInit)="onTrafficChartInit($event)" class="chart"></div>
     </div>
     <div class="chart-panel">
       <h3>Environmental</h3>
-      <div echarts [options]="envChartOpts" class="chart"></div>
+      <div echarts [options]="initOpts" [autoResize]="true" (chartInit)="onEnvChartInit($event)" class="chart"></div>
     </div>
   </div>
 
@@ -88,7 +88,7 @@
       @if (selectedPoleId) {
         <div class="chart-panel small">
           <h3>{{ selectedPoleId }} Detail</h3>
-          <div echarts [options]="poleChartOpts" class="chart"></div>
+          <div echarts [options]="initOpts" [autoResize]="true" (chartInit)="onPoleChartInit($event)" class="chart"></div>
         </div>
       }
 

@@ -19,17 +19,22 @@ interface ChatMessage {
 export class ChatComponent {
   @ViewChild('messagesContainer') messagesContainer!: ElementRef<HTMLDivElement>;
 
+  open = false;
   messages: ChatMessage[] = [];
   inputText = '';
   loading = false;
   suggestions: string[] = [
     'Summarize the last hour of telemetry',
-    'Which poles are consuming the most energy?',
+    'Which poles consume the most energy?',
     'Any anomalies detected recently?',
-    'Compare traffic between morning and evening',
+    'Compare morning vs evening traffic',
   ];
 
   private readonly apiBase = 'http://localhost:8000/api';
+
+  toggle(): void {
+    this.open = !this.open;
+  }
 
   async sendMessage(text?: string): Promise<void> {
     const message = text ?? this.inputText.trim();
@@ -56,10 +61,10 @@ export class ChatComponent {
         sources: data.sources?.length ? data.sources : undefined,
         timestamp: new Date(),
       });
-    } catch (err) {
+    } catch {
       this.messages.push({
         role: 'assistant',
-        content: `Connection error: Unable to reach the AI service. Make sure the Python service is running on port 8000.`,
+        content: 'Connection error: Unable to reach the AI service. Make sure the Python service is running on port 8000.',
         timestamp: new Date(),
       });
     } finally {

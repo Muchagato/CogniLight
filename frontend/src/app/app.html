@@ -1,10 +1,12 @@
 <nav class="top-nav">
-  <a class="brand" routerLink="/">CogniLight</a>
-  <div class="nav-links">
-    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Overview</a>
-    <a routerLink="/chat" routerLinkActive="active">AI Chat</a>
+  <span class="brand">CogniLight</span>
+  <div class="view-toggle" (click)="layout.toggleSim()">
+    <span class="toggle-option" [class.active]="!layout.simCollapsed()">Map</span>
+    <span class="toggle-option" [class.active]="layout.simCollapsed()">Dashboard</span>
+    <span class="toggle-slider" [class.right]="layout.simCollapsed()"></span>
   </div>
 </nav>
 <main>
   <router-outlet />
 </main>
+<app-chat />

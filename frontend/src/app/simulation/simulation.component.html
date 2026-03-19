@@ -8,11 +8,6 @@
       <button class="ctrl-btn" (click)="toggleRunning()">
         {{ running ? 'Pause' : 'Play' }}
       </button>
-      @for (s of [1, 2, 5, 10]; track s) {
-        <button class="ctrl-btn" [class.active]="speed === s" (click)="setSpeed(s)">
-          {{ s }}x
-        </button>
-      }
     </div>
     @if (selectedPoleId) {
       <span class="selected-pole">Selected: {{ selectedPoleId }}</span>
