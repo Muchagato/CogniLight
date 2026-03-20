@@ -29,7 +29,7 @@ from sse_starlette.sse import EventSourceResponse  # noqa: E402
 
 from anomaly.detector import detect_anomalies, summarize_anomalies, AnomalyReport  # noqa: E402
 from constants import TELEMETRY_COLUMNS  # noqa: E402
-from rag.chain import generate_response, generate_response_stream, LLMConfig  # noqa: E402
+from rag.chain import generate_response_stream, LLMConfig  # noqa: E402
 from rag.narrative import load_persisted_incidents, ingest_new_incidents  # noqa: E402
 from rag.retriever import Retriever  # noqa: E402
 
@@ -190,19 +190,6 @@ async def chat_status() -> dict[str, Any]:
 
 class ChatRequest(BaseModel):
     message: str = Field(..., max_length=2000)
-
-
-class ChatResponse(BaseModel):
-    reply: str
-    sources: list[str] = []
-
-
-@app.post("/api/chat", response_model=ChatResponse)
-@limiter.limit("10/minute")
-async def chat(request_body: ChatRequest, request: Request) -> ChatResponse:
-    cfg = _extract_llm_config(request)
-    reply, sources = await generate_response(request_body.message, retriever, engine, llm_config=cfg)
-    return ChatResponse(reply=reply, sources=sources)
 
 
 @app.post("/api/chat/stream")

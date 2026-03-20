@@ -1,5 +1,5 @@
-import { inject, Injectable, NgZone, OnDestroy } from '@angular/core';
-import { Subject, BehaviorSubject } from 'rxjs';
+import { inject, Injectable, NgZone } from '@angular/core';
+import { BehaviorSubject } from 'rxjs';
 import * as signalR from '@microsoft/signalr';
 import { TelemetryReading, TelemetryUpdate } from '../models/telemetry.model';
 
@@ -80,7 +80,7 @@ export const TIME_RANGES: TimeRangeConfig[] = [
 const MAX_HISTORY = 120;
 
 @Injectable({ providedIn: 'root' })
-export class TelemetryService implements OnDestroy {
+export class TelemetryService {
   private readonly zone = inject(NgZone);
   private hubConnection: signalR.HubConnection;
 
@@ -101,7 +101,6 @@ export class TelemetryService implements OnDestroy {
   private readonly selectedPoleSubject = new BehaviorSubject<string | null>(null);
   readonly selectedPoleId$ = this.selectedPoleSubject.asObservable();
 
-  private readonly destroy$ = new Subject<void>();
   private history: AggregateSnapshot[] = [];
   private anomalyLog: AnomalyEvent[] = [];
   private incidentLog: IncidentLog[] = [];
@@ -210,11 +209,5 @@ export class TelemetryService implements OnDestroy {
   async getIncidentLogsInRange(from: string, to: string, limit = 50, signal?: AbortSignal): Promise<IncidentLog[]> {
     const params = new URLSearchParams({ from, to, limit: String(limit) });
     return this.fetchJson(`${this.apiBase}/incidents?${params}`, { signal });
-  }
-
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
-    this.hubConnection.stop();
   }
 }

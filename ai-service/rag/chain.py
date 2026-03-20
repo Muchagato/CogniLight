@@ -112,50 +112,6 @@ def _build_prompt(query: str, sql_context: str, rag_narratives: list[str] | None
 
 
 # ---------------------------------------------------------------------------
-# Non-streaming
-# ---------------------------------------------------------------------------
-
-async def generate_response(
-    query: str,
-    retriever: Retriever,
-    engine: Engine,
-    *,
-    llm_config: LLMConfig | None = None,
-    top_k: int = 5,
-) -> tuple[str, list[str]]:
-    """Generate a hybrid SQL+RAG response. Returns (reply, source_texts)."""
-    logger.info("Chat query: %s", query)
-    cfg = llm_config or LLMConfig()
-
-    sql_result = build_sql_context(engine)
-
-    rag_narratives: list[str] | None = None
-    rag_chunks = []
-    if _needs_rag(query):
-        rag_chunks = retriever.search(query, top_k=top_k)
-        if rag_chunks:
-            rag_narratives = [c.text for c in rag_chunks]
-            logger.info("Retrieved %d incident log chunks via RAG", len(rag_narratives))
-
-    if not cfg.api_key:
-        return "No API key provided. Please configure your LLM API key in the chat settings.", []
-
-    logger.info("Calling %s provider (model=%s)", cfg.provider, cfg.effective_model)
-    prompt = _build_prompt(query, sql_result.text, rag_narratives)
-    source_texts = [c.text for c in rag_chunks]
-    try:
-        if cfg.provider == "anthropic":
-            reply = await _call_anthropic(prompt, cfg)
-        else:
-            reply = await _call_openai(prompt, cfg)
-        logger.info("LLM response length: %d chars", len(reply))
-        return reply, source_texts
-    except Exception as e:
-        logger.exception("LLM call failed")
-        return f"Error calling LLM: {e}", source_texts
-
-
-# ---------------------------------------------------------------------------
 # Streaming
 # ---------------------------------------------------------------------------
 
@@ -226,49 +182,7 @@ async def generate_response_stream(
 
 
 # ---------------------------------------------------------------------------
-# Provider calls — non-streaming
-# ---------------------------------------------------------------------------
-
-async def _call_anthropic(prompt: str, cfg: LLMConfig) -> str:
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(
-            f"{cfg.effective_base_url}/v1/messages",
-            headers={
-                "x-api-key": cfg.api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": cfg.effective_model,
-                "max_tokens": MAX_LLM_TOKENS,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.3,
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data["content"][0]["text"]
-
-
-async def _call_openai(prompt: str, cfg: LLMConfig) -> str:
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(
-            f"{cfg.effective_base_url}/chat/completions",
-            headers={"Authorization": f"Bearer {cfg.api_key}"},
-            json={
-                "model": cfg.effective_model,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": MAX_LLM_TOKENS,
-                "temperature": 0.3,
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data["choices"][0]["message"]["content"]
-
-
-# ---------------------------------------------------------------------------
-# Provider calls — streaming
+# Provider calls
 # ---------------------------------------------------------------------------
 
 async def _stream_anthropic(prompt: str, cfg: LLMConfig) -> AsyncGenerator[str, None]:
