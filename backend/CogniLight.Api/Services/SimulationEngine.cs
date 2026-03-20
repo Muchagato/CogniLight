@@ -294,6 +294,19 @@ public class SimulationEngine : IHostedService, IDisposable
             ps.Pedestrians += spike;
             pedestrians += spike;
         }
+        if (anomalyFlag && anomalyDesc?.Contains("air quality") == true)
+        {
+            ps.AirQuality = _rng.Next(120, 180);
+            airQuality = (int)ps.AirQuality;
+        }
+        if (anomalyFlag && anomalyDesc?.Contains("sensor dropout") == true)
+        {
+            // Zero out sensor readings to simulate the dropout
+            ps.AirQuality = 0;
+            airQuality = 0;
+            noise = 0;
+            ps.Noise = 0;
+        }
 
         // Notify incident log generator so it can create follow-up entries
         if (anomalyFlag && anomalyDesc != null)
