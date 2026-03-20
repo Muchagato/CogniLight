@@ -37,20 +37,15 @@ public class TelemetryService
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var poleIds = Enumerable.Range(1, 12).Select(i => $"POLE-{i:D2}");
-        var readings = new List<TelemetryReading>();
+        // Single query: get the max ID per pole, then fetch those rows
+        var latestIds = db.TelemetryReadings
+            .GroupBy(r => r.PoleId)
+            .Select(g => g.Max(r => r.Id));
 
-        foreach (var poleId in poleIds)
-        {
-            var latest = await db.TelemetryReadings
-                .Where(r => r.PoleId == poleId)
-                .OrderByDescending(r => r.Timestamp)
-                .FirstOrDefaultAsync();
-            if (latest != null)
-                readings.Add(latest);
-        }
-
-        return readings;
+        return await db.TelemetryReadings
+            .Where(r => latestIds.Contains(r.Id))
+            .OrderBy(r => r.PoleId)
+            .ToListAsync();
     }
 
     public async Task<List<TelemetryReading>> GetReadingsByPoleAsync(string poleId, int limit = 100)

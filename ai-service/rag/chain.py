@@ -16,6 +16,8 @@ from .sql_context import build_sql_context
 logger = logging.getLogger(__name__)
 
 
+MAX_LLM_TOKENS = 2048
+
 # ---------------------------------------------------------------------------
 # Per-request LLM configuration (BYOK)
 # ---------------------------------------------------------------------------
@@ -238,7 +240,7 @@ async def _call_anthropic(prompt: str, cfg: LLMConfig) -> str:
             },
             json={
                 "model": cfg.effective_model,
-                "max_tokens": 500,
+                "max_tokens": MAX_LLM_TOKENS,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.3,
             },
@@ -256,7 +258,7 @@ async def _call_openai(prompt: str, cfg: LLMConfig) -> str:
             json={
                 "model": cfg.effective_model,
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 500,
+                "max_tokens": MAX_LLM_TOKENS,
                 "temperature": 0.3,
             },
         )
@@ -282,7 +284,7 @@ async def _stream_anthropic(prompt: str, cfg: LLMConfig) -> AsyncGenerator[str, 
             },
             json={
                 "model": cfg.effective_model,
-                "max_tokens": 500,
+                "max_tokens": MAX_LLM_TOKENS,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.3,
                 "stream": True,
@@ -317,7 +319,7 @@ async def _stream_openai(prompt: str, cfg: LLMConfig) -> AsyncGenerator[str, Non
             json={
                 "model": cfg.effective_model,
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 500,
+                "max_tokens": MAX_LLM_TOKENS,
                 "temperature": 0.3,
                 "stream": True,
             },

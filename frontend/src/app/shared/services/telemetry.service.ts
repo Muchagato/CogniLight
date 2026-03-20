@@ -181,34 +181,35 @@ export class TelemetryService implements OnDestroy {
 
   private readonly apiBase = '/api';
 
+  private async fetchJson<T>(url: string, opts?: RequestInit): Promise<T> {
+    const resp = await fetch(url, opts);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+    return resp.json();
+  }
+
   async getHistory(from: string, to: string, bucketSeconds: number, signal?: AbortSignal): Promise<HistoryBucket[]> {
     const params = new URLSearchParams({ from, to, bucketSeconds: String(bucketSeconds) });
-    const resp = await fetch(`${this.apiBase}/telemetry/history?${params}`, { signal });
-    return resp.json();
+    return this.fetchJson(`${this.apiBase}/telemetry/history?${params}`, { signal });
   }
 
   async getPoleHistory(poleId: string, from: string, to: string, bucketSeconds: number, signal?: AbortSignal): Promise<PoleBucket[]> {
     const params = new URLSearchParams({ from, to, bucketSeconds: String(bucketSeconds) });
-    const resp = await fetch(`${this.apiBase}/telemetry/history/${poleId}?${params}`, { signal });
-    return resp.json();
+    return this.fetchJson(`${this.apiBase}/telemetry/history/${poleId}?${params}`, { signal });
   }
 
   async getAnomaliesInRange(from: string, to: string, limit = 200, signal?: AbortSignal): Promise<AnomalyEvent[]> {
     const params = new URLSearchParams({ from, to, limit: String(limit) });
-    const resp = await fetch(`${this.apiBase}/telemetry/anomalies/range?${params}`, { signal });
-    return resp.json();
+    return this.fetchJson(`${this.apiBase}/telemetry/anomalies/range?${params}`, { signal });
   }
 
   async getIncidentLogs(limit = 20, signal?: AbortSignal): Promise<IncidentLog[]> {
     const params = new URLSearchParams({ limit: String(limit) });
-    const resp = await fetch(`${this.apiBase}/incidents?${params}`, { signal });
-    return resp.json();
+    return this.fetchJson(`${this.apiBase}/incidents?${params}`, { signal });
   }
 
   async getIncidentLogsInRange(from: string, to: string, limit = 50, signal?: AbortSignal): Promise<IncidentLog[]> {
     const params = new URLSearchParams({ from, to, limit: String(limit) });
-    const resp = await fetch(`${this.apiBase}/incidents?${params}`, { signal });
-    return resp.json();
+    return this.fetchJson(`${this.apiBase}/incidents?${params}`, { signal });
   }
 
   ngOnDestroy(): void {

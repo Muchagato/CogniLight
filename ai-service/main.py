@@ -35,7 +35,7 @@ from rag.retriever import Retriever  # noqa: E402
 
 DB_PATH = os.getenv("DATABASE_PATH", "../backend/CogniLight.Api/cognilight.db")
 INGEST_INTERVAL = int(os.getenv("INGEST_INTERVAL", "10"))  # seconds
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "").split(",") if os.getenv("CORS_ORIGINS") else ["*"]
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "").split(",") if os.getenv("CORS_ORIGINS") else ["http://localhost:4200"]
 
 logger.info("AI Service starting in BYOK mode (no server-side API key)")
 
