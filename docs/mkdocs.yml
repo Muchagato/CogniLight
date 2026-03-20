@@ -1,0 +1,88 @@
+site_name: CogniLight Documentation
+site_description: Technical documentation for the CogniLight cognitive sensing platform
+site_url: https://cognilight.muchagato.dev/docs/
+repo_url: https://github.com/Muchagato/CogniLight
+repo_name: CogniLight
+dev_addr: 127.0.0.1:8080
+
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: custom
+    accent: amber
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+    - search.suggest
+    - search.highlight
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Architecture:
+    - architecture/index.md
+    - Data Flow: architecture/data-flow.md
+    - Design Decisions: architecture/design-decisions.md
+  - Backend (.NET):
+    - backend/index.md
+    - Simulation Engine: backend/simulation-engine.md
+    - Telemetry Service: backend/telemetry-service.md
+    - Incident Log System: backend/incident-logs.md
+    - API Reference: backend/api-reference.md
+  - Frontend (Angular):
+    - frontend/index.md
+    - Street Simulation: frontend/simulation.md
+    - Telemetry Dashboard: frontend/dashboard.md
+    - AI Chat Panel: frontend/chat.md
+    - Theme System: frontend/theming.md
+  - AI Service (Python):
+    - ai-service/index.md
+    - Hybrid SQL + RAG Pipeline: ai-service/rag-pipeline.md
+    - Anomaly Detection: ai-service/anomaly-detection.md
+    - API Reference: ai-service/api-reference.md
+  - Infrastructure:
+    - infrastructure/index.md
+    - Docker Setup: infrastructure/docker.md
+    - CI/CD Pipeline: infrastructure/ci-cd.md
+    - NAS Deployment: infrastructure/deployment.md
+  - Lessons Learned: lessons-learned.md

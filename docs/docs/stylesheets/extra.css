@@ -1,0 +1,39 @@
+/* CogniLight documentation theme overrides */
+
+:root {
+  --md-primary-fg-color: #f59e0b;
+  --md-primary-fg-color--light: #fbbf24;
+  --md-primary-fg-color--dark: #d97706;
+  --md-accent-fg-color: #22d3ee;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: #0f1218;
+  --md-default-bg-color--light: #14171e;
+}
+
+/* Mermaid diagram styling */
+.mermaid {
+  text-align: center;
+}
+
+/* Code block styling */
+.md-typeset code {
+  border-radius: 4px;
+}
+
+/* Admonition accent */
+.md-typeset .admonition.tip,
+.md-typeset details.tip {
+  border-color: #f59e0b;
+}
+
+.md-typeset .tip > .admonition-title,
+.md-typeset .tip > summary {
+  background-color: rgba(245, 158, 11, 0.1);
+}
+
+.md-typeset .tip > .admonition-title::before,
+.md-typeset .tip > summary::before {
+  background-color: #f59e0b;
+}
