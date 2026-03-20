@@ -116,11 +116,7 @@
                   <td>{{ r.airQualityAqi }}</td>
                   <td>{{ r.noiseDb | number:'1.0-0' }}</td>
                   <td>
-                    @if (r.anomalyFlag) {
-                      <span class="status-badge red">ALERT</span>
-                    } @else {
-                      <span class="status-badge green">OK</span>
-                    }
+                    <span class="status-badge" [class.red]="r.anomalyFlag" [class.green]="!r.anomalyFlag">{{ r.anomalyFlag ? 'ALERT' : 'OK' }}</span>
                   </td>
                 </tr>
               }
@@ -161,10 +157,12 @@
         <div class="anomaly-list">
           @for (a of filteredAnomalies; track $index) {
             <div class="anomaly-entry">
-              <span class="anomaly-severity" [ngClass]="getAnomalySeverity(a.description)"></span>
-              <span class="anomaly-time">{{ formatTime(a.time) }}</span>
-              <span class="anomaly-pole">{{ a.poleId }}</span>
-              <span class="anomaly-desc">{{ a.description }}</span>
+              <div class="anomaly-header">
+                <span class="anomaly-severity" [ngClass]="getAnomalySeverity(a.description)"></span>
+                <span class="anomaly-pole">{{ a.poleId }}</span>
+                <span class="anomaly-time">{{ formatTime(a.time) }}</span>
+              </div>
+              <div class="anomaly-desc">{{ a.description }}</div>
             </div>
           }
           @if (filteredAnomalies.length === 0) {
