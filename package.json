@@ -1,0 +1,12 @@
+{
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k -n be,fe,ai -c cyan,yellow,magenta \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:ai\"",
+    "dev:backend": "cd backend/CogniLight.Api && dotnet run --launch-profile http",
+    "dev:frontend": "cd frontend && npx ng serve",
+    "dev:ai": "cd ai-service && uvicorn main:app --port 8000"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
