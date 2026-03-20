@@ -10,21 +10,30 @@ import { LayoutService } from '../shared/services/layout.service';
   standalone: true,
   imports: [CommonModule, SimulationComponent, DashboardComponent, ChatComponent],
   template: `
-    <div class="home-layout">
+    <div class="home-layout" [class.mobile]="layout.isMobile()">
       @if (!layout.chatFullscreen()) {
-        <section class="sim-section" [class.collapsed]="layout.simCollapsed()">
+        <section class="sim-section"
+                 [class.collapsed]="layout.simCollapsed()"
+                 [class.mobile-hidden]="layout.isMobile() && layout.mobileView() !== 'map'">
           <app-simulation />
         </section>
-        <div class="divider" (click)="layout.toggleSim()" [title]="layout.simCollapsed() ? 'Show map' : 'Hide map'">
-          <div class="divider-toggle">
-            <span class="divider-arrow" [class.collapsed]="layout.simCollapsed()">&#9666;</span>
+        @if (!layout.isMobile()) {
+          <div class="divider" (click)="layout.toggleSim()" [title]="layout.simCollapsed() ? 'Show map' : 'Hide map'">
+            <div class="divider-toggle">
+              <span class="divider-arrow" [class.collapsed]="layout.simCollapsed()">&#9666;</span>
+            </div>
           </div>
-        </div>
-        <section class="dash-section">
+        }
+        <section class="dash-section"
+                 [class.mobile-hidden]="layout.isMobile() && layout.mobileView() !== 'dashboard'">
           <app-dashboard />
         </section>
       }
-      <section class="chat-section" [class.fullscreen]="layout.chatFullscreen()" [hidden]="!layout.chatOpen()">
+      <section class="chat-section"
+               [class.fullscreen]="layout.chatFullscreen()"
+               [hidden]="!layout.isMobile() && !layout.chatOpen()"
+               [class.mobile-hidden]="layout.isMobile() && layout.mobileView() !== 'chat'"
+               [class.mobile-chat]="layout.isMobile() && layout.mobileView() === 'chat'">
         <app-chat />
       </section>
     </div>
@@ -120,6 +129,27 @@ import { LayoutService } from '../shared/services/layout.service';
         flex: 1;
         width: auto;
         min-width: 0;
+        border-left: none;
+      }
+    }
+
+    // Mobile
+    .mobile-hidden {
+      display: none !important;
+    }
+
+    .home-layout.mobile {
+      .sim-section {
+        width: 100%;
+        min-width: 0;
+      }
+      .dash-section {
+        width: 100%;
+      }
+      .chat-section.mobile-chat {
+        width: 100%;
+        min-width: 0;
+        flex: 1;
         border-left: none;
       }
     }

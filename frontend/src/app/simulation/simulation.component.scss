@@ -97,4 +97,23 @@
   flex: 1;
   width: 100%;
   cursor: default;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@media (max-width: 768px) {
+  .sim-toolbar {
+    gap: 10px;
+    padding: 6px 12px;
+    min-height: 36px;
+  }
+
+  .sim-time {
+    font-size: 16px;
+  }
+
+  .selected-pole {
+    font-size: 11px;
+  }
 }

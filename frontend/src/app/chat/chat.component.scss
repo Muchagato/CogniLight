@@ -34,6 +34,7 @@
 .chat-subtitle {
   font-size: 11px;
   color: var(--cl-text-faint);
+  margin-right: auto;
 }
 
 .chat-header-btn {
@@ -50,9 +51,6 @@
   justify-content: center;
   transition: all 0.15s;
 
-  &:first-of-type {
-    margin-left: auto;
-  }
 
   &:hover {
     background: var(--cl-bg-hover);

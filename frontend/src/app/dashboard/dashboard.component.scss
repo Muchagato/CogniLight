@@ -611,7 +611,7 @@
   line-height: 1.5;
 }
 
-// Responsive
+// Responsive — tablet
 @media (max-width: 1200px) {
   .kpi-row {
     grid-template-columns: repeat(3, 1fr);
@@ -621,5 +621,103 @@
   }
   .detail-row {
     grid-template-columns: 1fr;
+  }
+}
+
+// Responsive — mobile
+@media (max-width: 768px) {
+  .dashboard {
+    padding: 12px;
+    gap: 10px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  .kpi-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+
+    // Last card spans full width when odd number of cards
+    .kpi-card:last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
+  }
+
+  .kpi-card {
+    padding: 12px 14px;
+  }
+
+  .kpi-value {
+    font-size: 22px;
+  }
+
+  .range-bar {
+    flex-wrap: wrap;
+    padding: 6px 8px;
+  }
+
+  .range-pills {
+    flex: 1;
+    display: flex;
+    gap: 0;
+    justify-content: space-between;
+  }
+
+  .range-pill {
+    flex: 1;
+    padding: 4px 0;
+    font-size: 10px;
+    text-align: center;
+  }
+
+  .range-info {
+    display: none;
+  }
+
+  .charts-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .chart {
+    height: 200px;
+  }
+
+  .detail-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    flex: none;
+  }
+
+  .pole-table-panel,
+  .anomaly-log-panel,
+  .incident-log-panel {
+    max-height: 300px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .pole-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .anomaly-list,
+  .incident-list {
+    overflow-x: hidden;
+  }
+
+  .anomaly-entry {
+    flex-wrap: wrap;
+  }
+
+  .incident-header {
+    flex-wrap: wrap;
+  }
+
+  .side-panels {
+    gap: 10px;
+    min-width: 0;
   }
 }
