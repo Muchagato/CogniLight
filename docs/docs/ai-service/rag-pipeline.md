@@ -8,7 +8,7 @@ The RAG pipeline is the core intelligence of CogniLight's AI chat. It combines t
 
 ```mermaid
 graph LR
-    Q[User Query] --> CLASSIFY{_needs_rag?}
+    Q[User Query] --> CLASSIFY{_sql_only?}
     Q --> SQL[SQL Context Builder]
 
     SQL --> DB[(SQLite)]
@@ -16,7 +16,7 @@ graph LR
     DB --> ANOMALIES[Recent anomalies]
     DB --> RANGE[Time range]
 
-    CLASSIFY -->|Yes| RAG[FAISS Search]
+    CLASSIFY -->|No| RAG[FAISS Search]
     RAG --> EMBED[Embed query]
     EMBED --> SEARCH[Top-5 chunks]
 
@@ -30,31 +30,29 @@ graph LR
 
 ## Step 1: Query Classification
 
-The `_needs_rag()` function decides whether incident log context is relevant:
+RAG context is **included by default**. The `_sql_only()` function identifies the small set of trivial factual queries where incident logs add no value:
 
 ```python
-_RAG_KEYWORDS = re.compile(
-    r"(?:maintenance|repair|incident|inspection|technician|fix|replaced|"
-    r"broke|broken|malfunction|wiring|sensor issue|spider|corrosion|"
-    r"water ingress|firmware|calibration|cleaned|diagnostic|"
-    r"happened|unusual|anomal|recurring|history|problem|issue)",
+_SQL_ONLY_KEYWORDS = re.compile(
+    r"(?:what time|current time|how many poles|number of poles|list (?:all )?poles)",
     re.I,
 )
 
-def _needs_rag(query: str) -> bool:
-    return bool(_RAG_KEYWORDS.search(query))
+def _sql_only(query: str) -> bool:
+    return bool(_SQL_ONLY_KEYWORDS.search(query))
 ```
 
-This is a deliberately simple heuristic. A more sophisticated approach would use the LLM itself to classify queries, but that adds latency (a round-trip before the actual answer).
+This opt-out approach is simpler and more robust than trying to enumerate all keywords that *should* trigger RAG. Most user questions benefit from narrative incident context, so it makes sense to include it unless we're confident it's unnecessary.
 
 **Examples:**
 
 | Query | RAG? | Why |
 |-------|------|-----|
-| "Which poles consume the most energy?" | No | Pure data question → SQL context is sufficient |
-| "Have there been any recurring sensor problems?" | Yes | "recurring", "problems" → needs incident log history |
-| "What maintenance was done on POLE-07?" | Yes | "maintenance" → needs incident logs |
-| "What's the current temperature?" | No | Current state → SQL context is sufficient |
+| "Which poles consume the most energy?" | Yes | Included by default — incident context may explain spikes |
+| "Have there been any recurring sensor problems?" | Yes | Included by default — incident logs are directly relevant |
+| "What maintenance was done on POLE-07?" | Yes | Included by default — incident logs are directly relevant |
+| "What time is it?" | No | Matches `_SQL_ONLY_KEYWORDS` — trivial factual lookup |
+| "How many poles are there?" | No | Matches `_SQL_ONLY_KEYWORDS` — trivial factual lookup |
 
 ---
 
@@ -115,9 +113,9 @@ Recent anomalies:
 
 ---
 
-## Step 3: RAG Retrieval (Conditional)
+## Step 3: RAG Retrieval (Default-On)
 
-If `_needs_rag()` returns True, the retriever performs a semantic search:
+Unless `_sql_only()` returns True, the retriever performs a semantic search:
 
 ### Embedding
 

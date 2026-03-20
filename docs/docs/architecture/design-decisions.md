@@ -93,9 +93,9 @@ Incident logs are free-text narratives ("Found corroded wiring at junction box. 
 **The hybrid approach:**
 
 1. **Every query** gets fresh SQL context: current readings per pole, rankings, recent anomalies
-2. **Maintenance/incident queries** (detected by keyword regex) additionally get semantically relevant incident logs from FAISS
+2. **RAG context is included by default** — incident logs from FAISS are added to every query unless it matches a narrow set of trivial factual patterns (e.g., "what time is it", "how many poles")
 
-The query router (`_needs_rag()`) is deliberately simple — a regex over keywords like "maintenance", "repair", "incident", "technician", etc. A more sophisticated approach would use the LLM itself to classify queries, but that would add a round-trip to every chat message.
+The query router uses an opt-out approach: a `_SQL_ONLY_KEYWORDS` regex identifies the small set of queries where incident logs add no value. Everything else gets RAG context automatically. This is simpler and more robust than trying to enumerate all the keywords that *should* trigger RAG.
 
 ---
 

@@ -106,7 +106,7 @@ Always emitted first. Contains the SQL queries run and their results.
 
 #### `sources`
 
-Emitted only if RAG is triggered (query contains maintenance/incident keywords).
+Emitted for most queries (RAG is included by default). Omitted only for trivial factual queries like "what time is it".
 
 ```json
 {

@@ -138,7 +138,7 @@ sequenceDiagram
     AI->>DB: SQL: simulation time range
     AI-->>FE: SSE event: sql_context (queries + results)
 
-    AI->>AI: _needs_rag("repairs") → True (keyword match)
+    AI->>AI: _sql_only("repairs") → False (not trivial factual)
     AI->>FAISS: Semantic search (top 5 chunks)
     AI-->>FE: SSE event: sources (incident log excerpts)
 
@@ -157,7 +157,7 @@ sequenceDiagram
 **Key design choices visible here:**
 
 1. **SQL context is always included** — every query gets fresh network state, regardless of whether RAG is needed. This ensures the LLM always knows "what's happening now."
-2. **RAG is conditionally triggered** — the `_needs_rag()` function uses a regex keyword match to decide if incident logs are relevant. This avoids embedding every query unnecessarily.
+2. **RAG is included by default** — incident log context is added to every query unless it matches a narrow `_SQL_ONLY_KEYWORDS` pattern (trivial factual lookups like "what time is it"). This opt-out approach ensures the LLM has narrative context for the vast majority of queries.
 3. **BYOK (Bring Your Own Key)** — the API key is sent per-request in HTTP headers, never stored server-side. The frontend persists it in `localStorage`.
 4. **Structured SSE events** — before any LLM tokens arrive, the frontend receives `sql_context` and `sources` events. This allows the UI to show "what data the AI is looking at" as expandable panels.
 5. **Streaming** — tokens arrive one-by-one via SSE, rendered as they arrive with markdown formatting.

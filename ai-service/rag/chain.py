@@ -45,18 +45,20 @@ class LLMConfig:
 # Query classification
 # ---------------------------------------------------------------------------
 
-_RAG_KEYWORDS = re.compile(
-    r"(?:maintenance|repair|incident|inspection|technician|fix|replaced|"
-    r"broke|broken|malfunction|wiring|sensor issue|spider|corrosion|corroded|"
-    r"water ingress|firmware|calibration|cleaned|diagnostic|"
-    r"happened|unusual|anomal|recurring|history|problem|issue)",
+_SQL_ONLY_KEYWORDS = re.compile(
+    r"^(?:what time|current time|how many poles|list poles|pole count)\b",
     re.I,
 )
 
 
 def _needs_rag(query: str) -> bool:
-    """Decide whether the query benefits from incident log RAG context."""
-    return bool(_RAG_KEYWORDS.search(query))
+    """Decide whether the query benefits from incident log RAG context.
+
+    Default to including RAG — incident logs explain *why* anomalies and
+    patterns appear in the telemetry.  Only skip for narrow factual lookups
+    that clearly don't need narrative context.
+    """
+    return not bool(_SQL_ONLY_KEYWORDS.search(query))
 
 
 # ---------------------------------------------------------------------------

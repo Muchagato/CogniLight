@@ -27,7 +27,7 @@ Three services sharing a single SQLite database. Backend is the sole writer; AI 
 
 - **Real-time:** SignalR pushes telemetry (1s ticks) and incident logs. Never poll for live data.
 - **Historical:** REST endpoints with bucketed aggregation for time-range queries.
-- **AI Chat:** SSE streaming. Hybrid SQL (always) + RAG over incident logs (keyword-triggered).
+- **AI Chat:** SSE streaming. Hybrid SQL (always) + RAG over incident logs (default-on, skipped only for trivial factual queries).
 - **LLM:** BYOK model — API key stored in browser localStorage, sent per-request via `X-LLM-*` headers. Supports Anthropic and OpenAI providers.
 
 ## Key Files
