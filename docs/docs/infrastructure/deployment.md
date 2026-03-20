@@ -114,13 +114,12 @@ The SQLite database is stored at `/volume2/docker/cognilight/data/cognilight.db`
 
 Currently, monitoring is minimal:
 
-- **Backend health:** `GET /health` — returns `{"status":"ok","service":"backend"}`
 - **AI service health:** `GET /health` — returns `{"status":"ok","service":"ai-service","index_size":"..."}`
 - **Container logs:** `docker logs cognilight-backend -f`
 - **Simulation status:** `GET /api/simulation/status`
 
 In a production deployment, you'd add:
 
-- Container health checks in the compose file using these endpoints
+- Health check endpoints and Docker `healthcheck` blocks
 - A monitoring stack (Prometheus + Grafana)
 - Alerting on container restarts or health check failures

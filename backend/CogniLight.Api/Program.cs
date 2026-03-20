@@ -114,9 +114,6 @@ if (!app.Environment.IsDevelopment())
     });
 }
 
-// Health check (outside rate-limited group)
-app.MapGet("/health", () => new { status = "ok", service = "backend" });
-
 // REST endpoints
 var api = app.MapGroup("/api").RequireRateLimiting("fixed");
 
