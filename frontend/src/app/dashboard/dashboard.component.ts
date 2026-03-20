@@ -259,13 +259,9 @@ export class DashboardComponent implements OnDestroy {
     this.cdr.detectChanges();
 
     try {
-      const signal = await this.fetchAndApplyHistoricalData(range);
+      const { fromIso, toIso, signal } = await this.fetchAndApplyHistoricalData(range);
 
-      this.fetchHistoricalPoleAverages(
-        new Date(new Date(this.simulationTime || Date.now()).getTime() - range.duration * 1000).toISOString(),
-        (this.simulationTime ? new Date(this.simulationTime) : new Date()).toISOString(),
-        range.bucket, signal
-      );
+      this.fetchHistoricalPoleAverages(fromIso, toIso, range.bucket, signal);
 
       // Start rolling window refresh
       this.refreshTickCounter = 0;
@@ -653,7 +649,7 @@ export class DashboardComponent implements OnDestroy {
   }
 
   /** Shared fetch logic for historical data — used by onRangeChange and rolling refresh. */
-  private async fetchAndApplyHistoricalData(range: TimeRangeConfig): Promise<AbortSignal> {
+  private async fetchAndApplyHistoricalData(range: TimeRangeConfig): Promise<{ fromIso: string; toIso: string; signal: AbortSignal }> {
     const now = this.simulationTime ? new Date(this.simulationTime) : new Date();
     const from = new Date(now.getTime() - range.duration * 1000);
     const fromIso = from.toISOString();
@@ -696,7 +692,7 @@ export class DashboardComponent implements OnDestroy {
     }
 
     this.cdr.detectChanges();
-    return signal;
+    return { fromIso, toIso, signal };
   }
 
   /** Re-fetch historical data with the current simulation time as the new window edge. */
