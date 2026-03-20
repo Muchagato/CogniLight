@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   frontend:
     build: ./frontend
@@ -7,6 +5,9 @@ services:
       - "4200:4200"
     depends_on:
       - backend
+      - ai-service
+    # In Docker, frontend nginx proxies /api/* and /hubs/* to backend and ai-service.
+    # For local dev without Docker, use `ng serve` with proxy.conf.json instead.
 
   backend:
     build: ./backend/CogniLight.Api
@@ -26,10 +27,6 @@ services:
       - backend
     environment:
       - DATABASE_PATH=/data/cognilight.db
-      - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
-      - LLM_BASE_URL=${LLM_BASE_URL:-}
-      - LLM_MODEL=${LLM_MODEL:-}
     volumes:
       - db-data:/data
 

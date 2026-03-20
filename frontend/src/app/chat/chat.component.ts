@@ -50,7 +50,13 @@ export class ChatComponent {
   loading = false;
   suggestions: string[] = [];
 
-  private readonly apiBase = 'http://localhost:8000/api';
+  // BYOK form state
+  byokProvider = 'anthropic';
+  byokApiKey = '';
+  byokModel = '';
+  showByokSettings = false;
+
+  private readonly apiBase = '/api';
 
   constructor() {
     this.loadSuggestions();
@@ -76,6 +82,50 @@ export class ChatComponent {
     this.loading = false;
   }
 
+  saveApiKey(): void {
+    if (!this.byokApiKey.trim()) return;
+    this.ai.saveConfig(this.byokApiKey.trim(), this.byokProvider, this.byokModel.trim() || undefined);
+    this.byokApiKey = '';
+    this.byokModel = '';
+    this.showByokSettings = false;
+    this.cdr.detectChanges();
+  }
+
+  clearApiKey(): void {
+    this.ai.clearConfig();
+    this.showByokSettings = false;
+    this.messages = [];
+    this.cdr.detectChanges();
+  }
+
+  toggleByokSettings(): void {
+    this.showByokSettings = !this.showByokSettings;
+    if (this.showByokSettings) {
+      const config = this.ai.getConfig();
+      if (config) {
+        this.byokProvider = config.provider;
+        this.byokModel = config.model;
+      }
+    }
+    this.cdr.detectChanges();
+  }
+
+  get currentProvider(): string {
+    const config = this.ai.getConfig();
+    return config?.provider === 'openai' ? 'OpenAI' : 'Anthropic';
+  }
+
+  private getLLMHeaders(): Record<string, string> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const config = this.ai.getConfig();
+    if (config) {
+      headers['X-LLM-API-Key'] = config.apiKey;
+      headers['X-LLM-Provider'] = config.provider;
+      if (config.model) headers['X-LLM-Model'] = config.model;
+    }
+    return headers;
+  }
+
   async sendMessage(text?: string): Promise<void> {
     const message = text ?? this.inputText.trim();
     if (!message || this.loading || !this.ai.configured()) return;
@@ -98,7 +148,7 @@ export class ChatComponent {
     try {
       const resp = await fetch(`${this.apiBase}/chat/stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getLLMHeaders(),
         body: JSON.stringify({ message }),
       });
 
@@ -153,7 +203,7 @@ export class ChatComponent {
       this.scrollToBottom();
     } catch {
       if (!assistantMsg.content) {
-        assistantMsg.content = 'Connection error: Unable to reach the AI service. Make sure the Python service is running on port 8000.';
+        assistantMsg.content = 'Connection error: Unable to reach the AI service.';
       }
       this.cdr.detectChanges();
     } finally {

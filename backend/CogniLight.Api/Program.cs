@@ -1,10 +1,18 @@
+using System.Threading.RateLimiting;
 using CogniLight.Api;
 using CogniLight.Api.Data;
 using CogniLight.Api.Hubs;
 using CogniLight.Api.Services;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Request size limit (10 MB)
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 10 * 1024 * 1024;
+});
 
 // Suppress noisy EF Core and SignalR logs
 builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
@@ -26,15 +34,30 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<IncidentLogGenerat
 builder.Services.AddSingleton<SimulationEngine>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<SimulationEngine>());
 
-// CORS — allow Angular dev server
+// CORS — configurable via CORS_ORIGINS env var (comma-separated), falls back to localhost for dev
+var corsOrigins = builder.Configuration["CORS_ORIGINS"];
+var origins = !string.IsNullOrWhiteSpace(corsOrigins)
+    ? corsOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    : new[] { "http://localhost:4200" };
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:4200")
+        policy.WithOrigins(origins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
+    });
+});
+
+// Rate limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = 429;
+    options.AddFixedWindowLimiter("fixed", limiter =>
+    {
+        limiter.PermitLimit = 60;
+        limiter.Window = TimeSpan.FromMinutes(1);
     });
 });
 
@@ -72,9 +95,24 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+app.UseRateLimiter();
+
+// Production: generic error responses, no stack traces
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler(error =>
+    {
+        error.Run(async context =>
+        {
+            context.Response.StatusCode = 500;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync("""{"error":"Internal server error"}""");
+        });
+    });
+}
 
 // REST endpoints
-var api = app.MapGroup("/api");
+var api = app.MapGroup("/api").RequireRateLimiting("fixed");
 
 api.MapGet("/telemetry/latest", async (TelemetryService svc) =>
     await svc.GetLatestReadingsAsync());

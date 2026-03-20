@@ -119,7 +119,7 @@ export class DashboardComponent implements OnDestroy {
         if (this.isLive) {
           this.updateKpis(r);
         }
-        this.cdr.detectChanges();
+        this.cdr.markForCheck();
       });
 
     this.telemetry.simulationTime$
@@ -139,14 +139,14 @@ export class DashboardComponent implements OnDestroy {
           }
         }
 
-        this.cdr.detectChanges();
+        this.cdr.markForCheck();
       });
 
     this.telemetry.connected$
       .pipe(takeUntil(this.destroy$))
       .subscribe(c => {
         this.connected = c;
-        this.cdr.detectChanges();
+        this.cdr.markForCheck();
       });
 
     this.telemetry.history$
@@ -163,7 +163,7 @@ export class DashboardComponent implements OnDestroy {
       .subscribe(a => {
         if (this.isLive) {
           this.anomalies = a;
-          this.cdr.detectChanges();
+          this.cdr.markForCheck();
         }
       });
 
@@ -171,7 +171,7 @@ export class DashboardComponent implements OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(logs => {
         this.incidentLogs = logs;
-        this.cdr.detectChanges();
+        this.cdr.markForCheck();
       });
 
     this.telemetry.selectedPoleId$
@@ -184,7 +184,7 @@ export class DashboardComponent implements OnDestroy {
         } else {
           this.fetchPoleHistory();
         }
-        this.cdr.detectChanges();
+        this.cdr.markForCheck();
       });
   }
 

@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass, field
 
 import httpx
 from sqlalchemy.engine import Engine
@@ -14,6 +14,31 @@ from .retriever import Retriever
 from .sql_context import build_sql_context
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Per-request LLM configuration (BYOK)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class LLMConfig:
+    """Per-request LLM configuration sent by the client."""
+    api_key: str = ""
+    provider: str = "anthropic"
+    model: str = ""
+    base_url: str = ""
+
+    @property
+    def effective_model(self) -> str:
+        if self.model:
+            return self.model
+        return "claude-haiku-4-5-20251001" if self.provider == "anthropic" else "gpt-4.1-nano"
+
+    @property
+    def effective_base_url(self) -> str:
+        if self.base_url:
+            return self.base_url
+        return "https://api.anthropic.com" if self.provider == "anthropic" else "https://api.openai.com/v1"
 
 
 # ---------------------------------------------------------------------------
@@ -31,29 +56,7 @@ _RAG_KEYWORDS = re.compile(
 
 def _needs_rag(query: str) -> bool:
     """Decide whether the query benefits from incident log RAG context."""
-    # Keyword heuristic — incident/maintenance related queries
     return bool(_RAG_KEYWORDS.search(query))
-
-
-# ---------------------------------------------------------------------------
-# LLM configuration
-# ---------------------------------------------------------------------------
-
-_LLM_API_KEY = os.getenv("LLM_API_KEY", "")
-_LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic")  # "anthropic" or "openai"
-_LLM_BASE_URL = os.getenv(
-    "LLM_BASE_URL",
-    "https://api.anthropic.com" if _LLM_PROVIDER == "anthropic" else "https://api.openai.com/v1",
-)
-_LLM_MODEL = os.getenv(
-    "LLM_MODEL",
-    "claude-haiku-4-5-20251001" if _LLM_PROVIDER == "anthropic" else "gpt-4.1-nano",
-)
-
-
-def is_llm_configured() -> bool:
-    """Return True if an LLM API key is set."""
-    return bool(_LLM_API_KEY)
 
 
 # ---------------------------------------------------------------------------
@@ -112,15 +115,16 @@ async def generate_response(
     query: str,
     retriever: Retriever,
     engine: Engine,
+    *,
+    llm_config: LLMConfig | None = None,
     top_k: int = 5,
 ) -> tuple[str, list[str]]:
     """Generate a hybrid SQL+RAG response. Returns (reply, source_texts)."""
     logger.info("Chat query: %s", query)
+    cfg = llm_config or LLMConfig()
 
-    # Always build SQL context
     sql_result = build_sql_context(engine)
 
-    # Optionally retrieve incident log context via RAG
     rag_narratives: list[str] | None = None
     rag_chunks = []
     if _needs_rag(query):
@@ -129,18 +133,17 @@ async def generate_response(
             rag_narratives = [c.text for c in rag_chunks]
             logger.info("Retrieved %d incident log chunks via RAG", len(rag_narratives))
 
-    if not _LLM_API_KEY:
-        logger.error("No API key configured")
-        return "LLM API key is not configured. Set LLM_API_KEY in your .env file.", []
+    if not cfg.api_key:
+        return "No API key provided. Please configure your LLM API key in the chat settings.", []
 
-    logger.info("Calling %s provider (model=%s)", _LLM_PROVIDER, _LLM_MODEL)
+    logger.info("Calling %s provider (model=%s)", cfg.provider, cfg.effective_model)
     prompt = _build_prompt(query, sql_result.text, rag_narratives)
     source_texts = [c.text for c in rag_chunks]
     try:
-        if _LLM_PROVIDER == "anthropic":
-            reply = await _call_anthropic(prompt)
+        if cfg.provider == "anthropic":
+            reply = await _call_anthropic(prompt, cfg)
         else:
-            reply = await _call_openai(prompt)
+            reply = await _call_openai(prompt, cfg)
         logger.info("LLM response length: %d chars", len(reply))
         return reply, source_texts
     except Exception as e:
@@ -156,15 +159,16 @@ async def generate_response_stream(
     query: str,
     retriever: Retriever,
     engine: Engine,
+    *,
+    llm_config: LLMConfig | None = None,
     top_k: int = 5,
 ) -> AsyncGenerator[dict, None]:
     """Stream a hybrid SQL+RAG response as SSE events."""
     logger.info("Stream chat query: %s", query)
+    cfg = llm_config or LLMConfig()
 
-    # Always build SQL context
     sql_result = build_sql_context(engine)
 
-    # Optionally retrieve incident log context via RAG
     rag_narratives: list[str] | None = None
     rag_chunks = []
     if _needs_rag(query):
@@ -173,7 +177,6 @@ async def generate_response_stream(
             rag_narratives = [c.text for c in rag_chunks]
             logger.info("Retrieved %d incident log chunks via RAG", len(rag_narratives))
 
-    # Emit SQL query metadata with results
     yield {
         "event": "sql_context",
         "data": {
@@ -190,7 +193,6 @@ async def generate_response_stream(
         },
     }
 
-    # Emit structured sources (RAG chunks if any)
     if rag_chunks:
         structured_sources = [
             {"text": c.text, "timestamp": c.timestamp, "poleIds": c.pole_ids}
@@ -198,20 +200,19 @@ async def generate_response_stream(
         ]
         yield {"event": "sources", "data": {"sources": structured_sources}}
 
-    if not _LLM_API_KEY:
-        logger.error("No API key configured")
-        yield {"event": "token", "data": {"text": "LLM API key is not configured. Set LLM_API_KEY in your .env file."}}
+    if not cfg.api_key:
+        yield {"event": "token", "data": {"text": "No API key provided. Please configure your LLM API key in the chat settings."}}
         yield {"event": "done", "data": {}}
         return
 
-    logger.info("Streaming from %s (model=%s)", _LLM_PROVIDER, _LLM_MODEL)
+    logger.info("Streaming from %s (model=%s)", cfg.provider, cfg.effective_model)
     prompt = _build_prompt(query, sql_result.text, rag_narratives)
     try:
-        if _LLM_PROVIDER == "anthropic":
+        if cfg.provider == "anthropic":
             stream_fn = _stream_anthropic
         else:
             stream_fn = _stream_openai
-        async for text in stream_fn(prompt):
+        async for text in stream_fn(prompt, cfg):
             yield {"event": "token", "data": {"text": text}}
     except Exception as e:
         logger.exception("LLM stream failed")
@@ -224,17 +225,17 @@ async def generate_response_stream(
 # Provider calls — non-streaming
 # ---------------------------------------------------------------------------
 
-async def _call_anthropic(prompt: str) -> str:
+async def _call_anthropic(prompt: str, cfg: LLMConfig) -> str:
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
-            f"{_LLM_BASE_URL}/v1/messages",
+            f"{cfg.effective_base_url}/v1/messages",
             headers={
-                "x-api-key": _LLM_API_KEY,
+                "x-api-key": cfg.api_key,
                 "anthropic-version": "2023-06-01",
                 "content-type": "application/json",
             },
             json={
-                "model": _LLM_MODEL,
+                "model": cfg.effective_model,
                 "max_tokens": 500,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.3,
@@ -245,13 +246,13 @@ async def _call_anthropic(prompt: str) -> str:
         return data["content"][0]["text"]
 
 
-async def _call_openai(prompt: str) -> str:
+async def _call_openai(prompt: str, cfg: LLMConfig) -> str:
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
-            f"{_LLM_BASE_URL}/chat/completions",
-            headers={"Authorization": f"Bearer {_LLM_API_KEY}"},
+            f"{cfg.effective_base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {cfg.api_key}"},
             json={
-                "model": _LLM_MODEL,
+                "model": cfg.effective_model,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 500,
                 "temperature": 0.3,
@@ -266,19 +267,19 @@ async def _call_openai(prompt: str) -> str:
 # Provider calls — streaming
 # ---------------------------------------------------------------------------
 
-async def _stream_anthropic(prompt: str) -> AsyncGenerator[str, None]:
+async def _stream_anthropic(prompt: str, cfg: LLMConfig) -> AsyncGenerator[str, None]:
     """Stream tokens from the Anthropic Messages API."""
     async with httpx.AsyncClient(timeout=60.0) as client:
         async with client.stream(
             "POST",
-            f"{_LLM_BASE_URL}/v1/messages",
+            f"{cfg.effective_base_url}/v1/messages",
             headers={
-                "x-api-key": _LLM_API_KEY,
+                "x-api-key": cfg.api_key,
                 "anthropic-version": "2023-06-01",
                 "content-type": "application/json",
             },
             json={
-                "model": _LLM_MODEL,
+                "model": cfg.effective_model,
                 "max_tokens": 500,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.3,
@@ -304,15 +305,15 @@ async def _stream_anthropic(prompt: str) -> AsyncGenerator[str, None]:
                     break
 
 
-async def _stream_openai(prompt: str) -> AsyncGenerator[str, None]:
+async def _stream_openai(prompt: str, cfg: LLMConfig) -> AsyncGenerator[str, None]:
     """Stream tokens from an OpenAI-compatible chat completions API."""
     async with httpx.AsyncClient(timeout=60.0) as client:
         async with client.stream(
             "POST",
-            f"{_LLM_BASE_URL}/chat/completions",
-            headers={"Authorization": f"Bearer {_LLM_API_KEY}"},
+            f"{cfg.effective_base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {cfg.api_key}"},
             json={
-                "model": _LLM_MODEL,
+                "model": cfg.effective_model,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 500,
                 "temperature": 0.3,

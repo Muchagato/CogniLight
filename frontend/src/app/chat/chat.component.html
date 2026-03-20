@@ -2,6 +2,11 @@
   <div class="chat-header">
     <span class="chat-title">CogniLight AI</span>
     <span class="chat-subtitle">RAG-powered analysis</span>
+    @if (ai.configured()) {
+      <button class="chat-provider-badge" (click)="toggleByokSettings()" title="API key settings">
+        {{ currentProvider }}
+      </button>
+    }
     <button class="chat-header-btn" (click)="newChat()" title="New chat">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="12" y1="5" x2="12" y2="19"/>
@@ -27,16 +32,50 @@
     </button>
   </div>
 
+  @if (showByokSettings && ai.configured()) {
+    <div class="byok-settings-dropdown">
+      <div class="byok-settings-row">
+        <span class="byok-settings-label">Provider</span>
+        <span class="byok-settings-value">{{ currentProvider }}</span>
+      </div>
+      <div class="byok-settings-row">
+        <span class="byok-settings-label">API Key</span>
+        <span class="byok-settings-value byok-key-mask">configured</span>
+      </div>
+      <button class="byok-clear-btn" (click)="clearApiKey()">Remove API key</button>
+    </div>
+  }
+
   <div class="messages" #messagesContainer>
     @if (messages.length === 0) {
       <div class="welcome">
         @if (!ai.configured()) {
-          <div class="no-api-key">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <div class="byok-setup">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
             </svg>
-            <h3>API key required</h3>
-            <p>Set <code>LLM_API_KEY</code> in your <code>.env</code> file and restart the AI service.</p>
+            <h3>Bring Your Own API Key</h3>
+            <p>Enter your LLM API key to enable AI-powered telemetry analysis. Your key is stored in your browser and sent per-request &mdash; never stored on the server.</p>
+            <div class="byok-form">
+              <div class="byok-field">
+                <label for="byok-provider">Provider</label>
+                <select id="byok-provider" [(ngModel)]="byokProvider">
+                  <option value="anthropic">Anthropic (Claude)</option>
+                  <option value="openai">OpenAI (GPT)</option>
+                </select>
+              </div>
+              <div class="byok-field">
+                <label for="byok-key">API Key</label>
+                <input id="byok-key" type="password" [(ngModel)]="byokApiKey" placeholder="sk-..." (keydown.enter)="saveApiKey()" />
+              </div>
+              <div class="byok-field">
+                <label for="byok-model">Model <span class="byok-optional">(optional)</span></label>
+                <input id="byok-model" type="text" [(ngModel)]="byokModel" [placeholder]="byokProvider === 'anthropic' ? 'claude-haiku-4-5-20251001' : 'gpt-4.1-nano'" />
+              </div>
+              <button class="byok-save-btn" (click)="saveApiKey()" [disabled]="!byokApiKey.trim()">
+                Enable AI Chat
+              </button>
+            </div>
           </div>
         } @else {
           <h3>Ask me about the lighting network</h3>
@@ -165,7 +204,7 @@
     <textarea
       [(ngModel)]="inputText"
       (keydown)="onKeydown($event)"
-      [placeholder]="ai.configured() ? 'Ask about energy, traffic, anomalies...' : 'LLM API key not configured'"
+      [placeholder]="ai.configured() ? 'Ask about energy, traffic, anomalies...' : 'Configure your API key above to start'"
       [disabled]="!ai.configured()"
       rows="1"
     ></textarea>

@@ -108,7 +108,7 @@ export class TelemetryService implements OnDestroy {
 
   constructor() {
     this.hubConnection = new signalR.HubConnectionBuilder()
-      .withUrl('http://localhost:5000/hubs/telemetry')
+      .withUrl('/hubs/telemetry')
       .withAutomaticReconnect()
       .build();
 
@@ -179,7 +179,7 @@ export class TelemetryService implements OnDestroy {
     this.selectedPoleSubject.next(poleId);
   }
 
-  private readonly apiBase = 'http://localhost:5000/api';
+  private readonly apiBase = '/api';
 
   async getHistory(from: string, to: string, bucketSeconds: number, signal?: AbortSignal): Promise<HistoryBucket[]> {
     const params = new URLSearchParams({ from, to, bucketSeconds: String(bucketSeconds) });

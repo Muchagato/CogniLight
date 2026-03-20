@@ -17,25 +17,27 @@ load_dotenv(_env_path)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from fastapi import FastAPI  # noqa: E402
+from fastapi import FastAPI, Request  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from pydantic import BaseModel  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
+from pydantic import BaseModel, Field  # noqa: E402
+from slowapi import Limiter  # noqa: E402
+from slowapi.util import get_remote_address  # noqa: E402
+from slowapi.errors import RateLimitExceeded  # noqa: E402
 from sqlalchemy import create_engine, text  # noqa: E402
 from sse_starlette.sse import EventSourceResponse  # noqa: E402
 
 from anomaly.detector import detect_anomalies, summarize_anomalies, AnomalyReport  # noqa: E402
 from constants import TELEMETRY_COLUMNS  # noqa: E402
-from rag.chain import generate_response, generate_response_stream, is_llm_configured  # noqa: E402
+from rag.chain import generate_response, generate_response_stream, LLMConfig  # noqa: E402
 from rag.narrative import load_persisted_incidents, ingest_new_incidents  # noqa: E402
 from rag.retriever import Retriever  # noqa: E402
 
 DB_PATH = os.getenv("DATABASE_PATH", "../backend/CogniLight.Api/cognilight.db")
 INGEST_INTERVAL = int(os.getenv("INGEST_INTERVAL", "10"))  # seconds
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "").split(",") if os.getenv("CORS_ORIGINS") else ["*"]
 
-if is_llm_configured():
-    logger.info("LLM API key is set (provider=%s, model=%s)", os.getenv("LLM_PROVIDER", "anthropic"), os.getenv("LLM_MODEL", "default"))
-else:
-    logger.warning("LLM API key is NOT set — chat will be disabled")
+logger.info("AI Service starting in BYOK mode (no server-side API key)")
 
 retriever = Retriever()
 _latest_anomalies: list[AnomalyReport] = []
@@ -48,6 +50,15 @@ def _get_engine():
 
 
 engine = _get_engine()
+
+
+def _extract_llm_config(request: Request) -> LLMConfig:
+    """Extract per-request LLM configuration from headers."""
+    return LLMConfig(
+        api_key=request.headers.get("x-llm-api-key", ""),
+        provider=request.headers.get("x-llm-provider", "anthropic"),
+        model=request.headers.get("x-llm-model", ""),
+    )
 
 
 def _ingest_anomalies() -> None:
@@ -131,14 +142,29 @@ async def lifespan(app: FastAPI):
     task.cancel()
 
 
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(title="CogniLight AI Service", version="0.1.0", lifespan=lifespan)
+app.state.limiter = limiter
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-LLM-API-Key", "X-LLM-Provider", "X-LLM-Model"],
 )
+
+
+# Global exception handlers — never leak internals
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(status_code=429, content={"error": "Rate limit exceeded. Please wait before trying again."})
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
 
 @app.get("/health")
@@ -147,28 +173,14 @@ async def health() -> dict[str, str]:
 
 
 @app.get("/api/chat/status")
-async def chat_status() -> dict[str, bool]:
-    return {"configured": is_llm_configured()}
-
-
-@app.get("/api/debug/chunks")
-async def debug_chunks(limit: int = 20, offset: int = 0):
-    """Inspect incident log chunks stored in the FAISS index."""
-    chunks = retriever.chunks[offset:offset + limit]
-    return {
-        "total": len(retriever.chunks),
-        "showing": f"{offset}-{offset + len(chunks)}",
-        "chunks": [
-            {"timestamp": c.timestamp, "poleIds": c.pole_ids, "text": c.text}
-            for c in chunks
-        ],
-    }
+async def chat_status() -> dict[str, Any]:
+    return {"configured": True, "mode": "byok"}
 
 
 # --- Chat ---
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., max_length=2000)
 
 
 class ChatResponse(BaseModel):
@@ -177,17 +189,22 @@ class ChatResponse(BaseModel):
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest) -> ChatResponse:
-    reply, sources = await generate_response(request.message, retriever, engine)
+@limiter.limit("10/minute")
+async def chat(request_body: ChatRequest, request: Request) -> ChatResponse:
+    cfg = _extract_llm_config(request)
+    reply, sources = await generate_response(request_body.message, retriever, engine, llm_config=cfg)
     return ChatResponse(reply=reply, sources=sources)
 
 
 @app.post("/api/chat/stream")
-async def chat_stream(request: ChatRequest):
+@limiter.limit("10/minute")
+async def chat_stream(request_body: ChatRequest, request: Request):
     import json
 
+    cfg = _extract_llm_config(request)
+
     async def event_generator():
-        async for event in generate_response_stream(request.message, retriever, engine):
+        async for event in generate_response_stream(request_body.message, retriever, engine, llm_config=cfg):
             yield {"event": event["event"], "data": json.dumps(event["data"])}
 
     return EventSourceResponse(event_generator())

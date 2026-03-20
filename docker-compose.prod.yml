@@ -1,0 +1,46 @@
+services:
+  frontend:
+    image: ${IMAGE_PREFIX}/frontend:latest
+    container_name: cognilight-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - ai-service
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - nginx_internal_network
+
+  backend:
+    image: ${IMAGE_PREFIX}/backend:latest
+    container_name: cognilight-backend
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__Default=Data Source=/data/cognilight.db
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+    volumes:
+      - /volume2/docker/cognilight/data:/data
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - nginx_internal_network
+
+  ai-service:
+    image: ${IMAGE_PREFIX}/ai-service:latest
+    container_name: cognilight-ai
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      - DATABASE_PATH=/data/cognilight.db
+    volumes:
+      - /volume2/docker/cognilight/data:/data
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - nginx_internal_network
+
+networks:
+  nginx_internal_network:
+    external: true
