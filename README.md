@@ -1,123 +1,87 @@
-# CogniLight — Cognitive Sensing Platform for Smart Lighting Networks
+# CogniLight
 
-A full-stack simulation of a smart city lighting network with cognitive sensing capabilities. Simulates a city block with 12 smart light poles, each equipped with virtual sensors producing real-time telemetry.
+A full-stack simulation of a smart city lighting network with cognitive sensing capabilities. Twelve smart light poles generate real-time telemetry across a simulated city block — each pole aware of its surroundings, adapting its behavior to zone type, time of day, and detected activity.
 
-## Architecture
+Built with Angular 21, .NET 10, and Python (FastAPI), deployed via Docker Compose with automated CI/CD to a self-hosted NAS.
 
-```
-Angular Frontend (port 4200)
-  ├── Street Simulation (HTML5 Canvas)
-  ├── Telemetry Dashboard (ECharts)
-  └── AI Chat (RAG-powered)
-         ↕ SignalR / REST
-.NET Backend (port 5000)
-  ├── SimulationEngine (IHostedService)
-  ├── SignalR TelemetryHub
-  └── SQLite via EF Core
-         ↕ SQLite
-Python AI Service (port 8000)
-  ├── RAG Pipeline (FAISS + sentence-transformers)
-  └── Anomaly Detection
-```
+## How It Works
 
-## Quick Start
+The backend runs a simulation engine that ticks once per second, producing telemetry for every pole: energy consumption, pedestrian/vehicle/cyclist counts, environmental readings, and adaptive dimming output. Each pole's behavior is shaped by its zone type — an office district is busy during work hours and dead at night, while a hotel maintains steady activity around the clock.
 
-### Prerequisites
-- [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- [Node.js 22+](https://nodejs.org/)
-- [Python 3.11+](https://www.python.org/downloads/)
+Telemetry is pushed to the frontend in real time via SignalR. The dashboard visualizes it with time-series charts, KPI cards, and per-pole drill-down. The street simulation renders the same data as an animated canvas scene with entities fading in and out based on live counts.
 
-### 1. Backend
+An AI chat interface lets users query the data in natural language. It uses a hybrid pipeline: direct SQL queries for current network state, plus semantic search (FAISS) over maintenance incident logs for narrative context. Users bring their own LLM API key (Anthropic or OpenAI).
 
-```bash
-cd backend/CogniLight.Api
-dotnet run --launch-profile http
-```
-
-The API starts on `http://localhost:5000`. The simulation engine begins generating telemetry immediately.
-
-### 2. Frontend
-
-```bash
-cd frontend
-npm install
-npx ng serve
-```
-
-Open `http://localhost:4200`. The layout shows the street simulation (left) and telemetry dashboard (right) side by side, with a toggle in the nav bar to show/hide the map.
-
-### 3. AI Service (optional)
-
-```bash
-cd ai-service
-pip install -r requirements.txt
-uvicorn main:app --port 8000
-```
-
-The AI service reads telemetry from the backend's SQLite database and provides RAG-powered chat. Configure your LLM API key in the chat panel's settings (BYOK — Bring Your Own Key). Supports Anthropic and OpenAI-compatible providers.
-
-### Docker Compose
+## Running It
 
 ```bash
 docker compose up --build
 ```
 
-Services: frontend (:4200), backend (:5000), ai-service (:8000).
+Open [localhost:4200](http://localhost:4200). The simulation starts immediately.
 
-## Features
+Or run each service individually:
 
-### Street Simulation
-- Top-down 2D canvas rendering of a city block with two streets and a crossroad
-- 12 light poles with sensor radius visualization and adaptive glow effects
-- Animated entities (pedestrians, vehicles, cyclists) driven by real-time counts
-- Per-pole zone-based activity profiles (Office, Retail, Park, School, Mall, Apartment, Gym, Residential, Cafe, Mixed, Tower, Hotel) with realistic time-of-day curves
-- Time-of-day cycle with lighting effects, vehicle headlights
-- Play/pause controls, click-to-select pole interaction
-- Collapsible via nav bar toggle to give the dashboard full width
+```bash
+# Backend — starts simulation engine, serves REST + SignalR on :5000
+cd backend/CogniLight.Api && dotnet run --launch-profile http
 
-### Telemetry Dashboard
-- KPI summary cards: total energy, pedestrian/vehicle counts, AQI, anomaly count
-- Real-time ECharts: energy consumption, stacked traffic density, environmental metrics
-- Per-pole detail table with radar chart on selection
-- Anomaly log with timestamped events
+# Frontend — Angular dev server on :4200
+cd frontend && npm install && npx ng serve
 
-### AI Chat
-- RAG pipeline: telemetry → text summaries → FAISS embeddings → context retrieval
-- Pole zone context: AI knows each pole's nearby building type and expected activity patterns
-- Natural language queries about energy, traffic, anomalies, trends
-- Demo mode with rule-based responses when no LLM API key is configured
-- Suggested prompts for common queries
+# AI Service (optional) — FastAPI on :8000
+cd ai-service && pip install -r requirements.txt && uvicorn main:app --port 8000
+```
 
-### Per-Pole Telemetry
-Each pole generates every simulation tick:
-- Energy consumption (50-250W, adaptive dimming)
-- Pedestrian, vehicle, cyclist counts (zone-aware, time-of-day driven)
-- Ambient light (solar curve), temperature, humidity
-- Air quality index, noise level
-- Light output level (adaptive)
-- Context-aware anomaly injection (~0.3% per pole per tick)
+## Architecture
 
-### Theming
-- Dark theme (charcoal/navy) with amber and cyan accents
-- Centralized color definitions: CSS custom properties (`theme.scss`), canvas renderer constants (`renderer/theme.ts`), ECharts constants (`shared/chart-theme.ts`)
+```
+Angular 21 (:4200)                    .NET 10 (:5000)               Python FastAPI (:8000)
+┌─────────────────────┐          ┌──────────────────────┐       ┌───────────────────────┐
+│  Street Simulation  │◄──WS────│  SimulationEngine    │       │  Hybrid SQL+RAG       │
+│  (HTML5 Canvas)     │         │  (1s tick, 12 poles)  │       │  Pipeline             │
+│                     │         │                      │       │                       │
+│  Dashboard          │◄──WS────│  IncidentLogGenerator│       │  FAISS Vector Index   │
+│  (ECharts)          │         │  (anomaly follow-ups)│       │  (incident logs)      │
+│                     │         │                      │       │                       │
+│  AI Chat            │──SSE───►│  SignalR Hub         │       │  Anomaly Detector     │
+│  (BYOK streaming)   │         │  REST API            │       │  (rule-based)         │
+└─────────────────────┘         └──────────┬───────────┘       └───────────┬───────────┘
+                                           │                               │
+                                           └──────── SQLite ◄──────────────┘
+                                                   (shared volume)
+```
+
+All three services share a single SQLite database. The backend is the sole writer; the AI service reads it directly for query context.
+
+## Key Technical Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| **SQLite** over Postgres | Single-file DB, no infrastructure dependency. WAL mode handles concurrent reader/writer safely. |
+| **SignalR** for real-time | Automatic reconnection, transport fallback, message framing — avoids building these on raw WebSocket. |
+| **SSE** for chat streaming | Unidirectional token stream. Simpler than WebSocket, supports named events (`sql_context`, `sources`, `token`). |
+| **BYOK** for LLM access | API key stays in browser localStorage, passes through per-request. No server-side secret management. |
+| **Hybrid SQL+RAG** | Structured queries for current state (always fresh), semantic search for incident logs (narrative context). |
+| **3-file theme** | Canvas 2D and ECharts can't read CSS variables, so colors are synced across `theme.scss`, `renderer/theme.ts`, and `chart-theme.ts`. |
+
+## Tech Stack
+
+| | |
+|---|---|
+| **Frontend** | Angular 21, TypeScript, HTML5 Canvas, ECharts, SignalR client |
+| **Backend** | .NET 10, C#, EF Core, SQLite, SignalR |
+| **AI Service** | Python 3.11, FastAPI, FAISS, sentence-transformers, httpx |
+| **Infrastructure** | Docker Compose, GitHub Actions, GHCR, Watchtower |
 
 ## Documentation
 
-Full technical documentation is available at `/docs` when running the application, or locally via:
+Comprehensive technical docs are built into the application at [`/docs`](http://localhost:4200/docs) — covering architecture, data flow, every service in depth, API reference, infrastructure, and lessons learned.
+
+To preview the docs locally:
 
 ```bash
 cd docs
 pip install -r requirements.txt
-mkdocs serve -a localhost:8080
+mkdocs serve
 ```
-
-Covers architecture, data flow, design decisions, API reference, and lessons learned.
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Angular 21, TypeScript, HTML5 Canvas, ECharts, SignalR client |
-| Backend | .NET 10, C#, EF Core, SQLite, SignalR |
-| AI Service | Python 3.11, FastAPI, sentence-transformers, FAISS |
-| Containerization | Docker Compose |
