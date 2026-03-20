@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field  # noqa: E402
 from slowapi import Limiter  # noqa: E402
 from slowapi.util import get_remote_address  # noqa: E402
 from slowapi.errors import RateLimitExceeded  # noqa: E402
-from sqlalchemy import create_engine, text  # noqa: E402
+from sqlalchemy import create_engine, event, text  # noqa: E402
 from sse_starlette.sse import EventSourceResponse  # noqa: E402
 
 from anomaly.detector import detect_anomalies, summarize_anomalies, AnomalyReport  # noqa: E402
@@ -46,7 +46,16 @@ _last_anomaly_id: int = 0
 
 
 def _get_engine():
-    return create_engine(f"sqlite:///{DB_PATH}", echo=False)
+    eng = create_engine(f"sqlite:///{DB_PATH}", echo=False)
+
+    # Enable WAL mode for concurrent reads while backend writes
+    @event.listens_for(eng, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL;")
+        cursor.close()
+
+    return eng
 
 
 engine = _get_engine()

@@ -71,6 +71,9 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
 
+    // Enable WAL mode for concurrent read/write (AI service reads while backend writes)
+    db.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
+
     // EnsureCreated won't add new tables to an existing DB — create manually if missing
     db.Database.ExecuteSqlRaw("""
         CREATE TABLE IF NOT EXISTS IncidentLogs (
