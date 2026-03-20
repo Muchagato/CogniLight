@@ -33,6 +33,7 @@ export const CT = {
   temperature: '#ef4444',
   humidity: '#3b82f6',
   aqi: '#16a34a',
+  noise: '#a78bfa',
 } as const;
 
 /** Shared tooltip style */

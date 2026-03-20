@@ -149,24 +149,17 @@
     </div>
 
     <div class="side-panels">
-      <!-- Pole detail chart -->
-      @if (selectedPoleId) {
-        <div class="chart-panel small">
-          <h3>{{ selectedPoleId }} {{ isLive ? 'Detail' : 'History' }}</h3>
-          <div echarts [options]="initOpts" [autoResize]="true" (chartInit)="onPoleChartInit($event)" class="chart"></div>
-        </div>
-      }
-
       <!-- Anomaly Log -->
       <div class="anomaly-log-panel">
         <h3>
           Anomaly Log
-          @if (anomalies.length > 0) {
-            <span class="anomaly-count-badge">{{ anomalies.length }}</span>
+          @if (selectedPoleId) { <span class="filter-badge">{{ selectedPoleId }}</span> }
+          @if (filteredAnomalies.length > 0) {
+            <span class="anomaly-count-badge">{{ filteredAnomalies.length }}</span>
           }
         </h3>
         <div class="anomaly-list">
-          @for (a of anomalies; track $index) {
+          @for (a of filteredAnomalies; track $index) {
             <div class="anomaly-entry">
               <span class="anomaly-severity" [ngClass]="getAnomalySeverity(a.description)"></span>
               <span class="anomaly-time">{{ formatTime(a.time) }}</span>
@@ -174,7 +167,7 @@
               <span class="anomaly-desc">{{ a.description }}</span>
             </div>
           }
-          @if (anomalies.length === 0) {
+          @if (filteredAnomalies.length === 0) {
             <div class="empty-state">No anomalies detected{{ isLive ? ' yet' : ' in this period' }}.</div>
           }
         </div>
@@ -184,12 +177,13 @@
       <div class="incident-log-panel">
         <h3>
           Incident Logs
-          @if (incidentLogs.length > 0) {
-            <span class="incident-count-badge">{{ incidentLogs.length }}</span>
+          @if (selectedPoleId) { <span class="filter-badge">{{ selectedPoleId }}</span> }
+          @if (filteredIncidentLogs.length > 0) {
+            <span class="incident-count-badge">{{ filteredIncidentLogs.length }}</span>
           }
         </h3>
         <div class="incident-list">
-          @for (log of incidentLogs; track log.id) {
+          @for (log of filteredIncidentLogs; track log.id) {
             <div class="incident-entry">
               <div class="incident-header">
                 <span class="incident-category" [ngClass]="getIncidentCategoryClass(log.category)">{{ log.category }}</span>
@@ -200,8 +194,8 @@
               <div class="incident-text">{{ log.text }}</div>
             </div>
           }
-          @if (incidentLogs.length === 0) {
-            <div class="empty-state">No incident logs yet.</div>
+          @if (filteredIncidentLogs.length === 0) {
+            <div class="empty-state">No incident logs{{ selectedPoleId ? ' for ' + selectedPoleId : ' yet' }}.</div>
           }
         </div>
       </div>

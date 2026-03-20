@@ -81,7 +81,6 @@ export class DashboardComponent implements OnDestroy {
   private energyChart: any = null;
   private trafficChart: any = null;
   private envChart: any = null;
-  private poleChart: any = null;
 
   readonly initOpts: EChartsOption = {};
 
@@ -180,7 +179,6 @@ export class DashboardComponent implements OnDestroy {
         this.selectedPoleId = id;
         if (this.isLive) {
           this.updateCharts();
-          this.updatePoleChart();
         } else {
           this.fetchPoleHistory();
         }
@@ -231,14 +229,6 @@ export class DashboardComponent implements OnDestroy {
     setTimeout(() => { this.envChart?.resize(); this.updateCharts(); });
   }
 
-  onPoleChartInit(chart: unknown): void {
-    this.poleChart = chart;
-    setTimeout(() => {
-      this.poleChart?.resize();
-      if (this.isLive) this.updatePoleChart();
-      else this.updateHistoricalPoleChart();
-    });
-  }
 
   // --- Time range ---
 
@@ -258,7 +248,6 @@ export class DashboardComponent implements OnDestroy {
       this.anomalies = this.telemetry['anomalyLog'] || [];
       this.incidentLogs = this.telemetry['incidentLog'] || [];
       this.updateCharts();
-      this.updatePoleChart();
       this.cdr.detectChanges();
       return;
     }
@@ -340,7 +329,6 @@ export class DashboardComponent implements OnDestroy {
         this.selectedPoleId, from.toISOString(), now.toISOString(), range.bucket
       );
       this.updateCharts();
-      this.updateHistoricalPoleChart();
       this.cdr.detectChanges();
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
@@ -402,6 +390,16 @@ export class DashboardComponent implements OnDestroy {
     this.totalVehicles = Math.round(data.reduce((s, d) => s + d.totalVehicles, 0) / n);
     this.avgAqi = Math.round(data.reduce((s, d) => s + d.avgAqi, 0) / n);
     this.activeAnomalies = data.reduce((s, d) => s + d.anomalyCount, 0);
+  }
+
+  get filteredAnomalies(): AnomalyEvent[] {
+    if (!this.selectedPoleId) return this.anomalies;
+    return this.anomalies.filter(a => a.poleId === this.selectedPoleId);
+  }
+
+  get filteredIncidentLogs(): IncidentLog[] {
+    if (!this.selectedPoleId) return this.incidentLogs;
+    return this.incidentLogs.filter(l => l.poleId === this.selectedPoleId);
   }
 
   selectPole(poleId: string): void {
@@ -530,6 +528,7 @@ export class DashboardComponent implements OnDestroy {
     temp: number[];
     humidity: number[];
     aqi: number[];
+    noise: number[];
   } | null {
 
     if (this.isLive) {
@@ -546,6 +545,7 @@ export class DashboardComponent implements OnDestroy {
           temp: snapshots.map(s => +s.temp.toFixed(1)),
           humidity: snapshots.map(s => +s.humidity.toFixed(1)),
           aqi: snapshots.map(s => Math.round(s.aqi)),
+          noise: snapshots.map(s => Math.round(s.noise)),
         };
       }
       // Aggregate live data
@@ -559,6 +559,7 @@ export class DashboardComponent implements OnDestroy {
         temp: this.history.map(h => h.avgTemperature),
         humidity: this.history.map(h => h.avgHumidity),
         aqi: this.history.map(h => h.avgAqi),
+        noise: this.history.map(h => h.avgNoise),
       };
     }
 
@@ -573,6 +574,7 @@ export class DashboardComponent implements OnDestroy {
         temp: this.historicalPoleData.map(d => +d.avgTemperature.toFixed(1)),
         humidity: this.historicalPoleData.map(d => +d.avgHumidity.toFixed(1)),
         aqi: this.historicalPoleData.map(d => Math.round(d.avgAqi)),
+        noise: this.historicalPoleData.map(d => Math.round(d.avgNoise)),
       };
     }
     if (this.historicalData.length < 2) return null;
@@ -585,6 +587,7 @@ export class DashboardComponent implements OnDestroy {
       temp: this.historicalData.map(h => h.avgTemperature),
       humidity: this.historicalData.map(h => h.avgHumidity),
       aqi: this.historicalData.map(h => h.avgAqi),
+      noise: this.historicalData.map(h => h.avgNoise),
     };
   }
 
@@ -659,7 +662,7 @@ export class DashboardComponent implements OnDestroy {
       animationDuration: 300,
       grid: { top: 36, right: 50, bottom: gridBottom, left: 50 },
       tooltip: { trigger: 'axis', ...TOOLTIP_STYLE },
-      legend: { data: ['Temp', 'Humidity', 'AQI'], textStyle: { color: CT.legendText, fontSize: 10 }, top: 0 },
+      legend: { data: ['Temp', 'Humidity', 'AQI', 'Noise'], textStyle: { color: CT.legendText, fontSize: 10 }, top: 0 },
       xAxis: timeAxis,
       yAxis: [
         { type: 'value', axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
@@ -670,88 +673,12 @@ export class DashboardComponent implements OnDestroy {
         { name: 'Temp', type: 'line', data: tp(arrays.times, arrays.temp), smooth: true, symbol: 'none', lineStyle: { color: CT.temperature }, itemStyle: { color: CT.temperature } },
         { name: 'Humidity', type: 'line', data: tp(arrays.times, arrays.humidity), smooth: true, symbol: 'none', lineStyle: { color: CT.humidity }, itemStyle: { color: CT.humidity } },
         { name: 'AQI', type: 'line', yAxisIndex: 1, data: tp(arrays.times, arrays.aqi), smooth: true, symbol: 'none', lineStyle: { color: CT.aqi }, itemStyle: { color: CT.aqi } },
+        { name: 'Noise', type: 'line', yAxisIndex: 1, data: tp(arrays.times, arrays.noise), smooth: true, symbol: 'none', lineStyle: { color: CT.noise }, itemStyle: { color: CT.noise } },
       ],
     }, notMerge);
 
-    if (this.isLive) {
-      this.updatePoleChart();
-    } else {
-      this.updateHistoricalPoleChart();
-    }
   }
 
-  private updatePoleChart(): void {
-    if (!this.selectedPoleId || this.history.length < 2) return;
-
-    const pole = this.readings.find(r => r.poleId === this.selectedPoleId);
-    if (!pole) return;
-
-    const metrics = ['Energy', 'Light%', 'AQI', 'Noise', 'Temp'];
-    const values = [
-      pole.energyWatts,
-      pole.lightLevelPct,
-      pole.airQualityAqi,
-      pole.noiseDb,
-      pole.temperatureC,
-    ];
-
-    this.poleChart?.setOption({
-      animation: false,
-      radar: {
-        indicator: metrics.map(m => ({ name: m, max: m === 'Energy' ? 250 : m === 'AQI' ? 150 : m === 'Temp' ? 40 : 100 })),
-        axisName: { color: CT.radarAxisName },
-        splitArea: { areaStyle: { color: [CT.radarSplitArea1, CT.radarSplitArea2] } },
-        splitLine: { lineStyle: { color: CT.axisLine } },
-        axisLine: { lineStyle: { color: CT.axisLine } },
-      },
-      series: [{
-        type: 'radar',
-        data: [{ value: values, name: this.selectedPoleId }],
-        lineStyle: { color: CT.pedestrian },
-        areaStyle: { color: CT.pedestrianArea },
-        itemStyle: { color: CT.pedestrian },
-      }],
-    }, true);
-  }
-
-  private updateHistoricalPoleChart(): void {
-    if (!this.selectedPoleId || !this.historicalPoleData.length) return;
-
-    const times = this.historicalPoleData.map(d => d.bucketStart);
-    const timeFmt = this.getTimeAxisFormat();
-    const tp = this.timePair.bind(this);
-
-    const dataZoom = [
-      { type: 'inside', start: 0, end: 100 },
-      {
-        type: 'slider', start: 0, end: 100, height: 16, bottom: 4,
-        borderColor: CT.axisLine,
-        fillerColor: 'rgba(34,211,238,0.1)',
-        handleStyle: { color: '#22d3ee' },
-        textStyle: { color: CT.axisLabel, fontSize: 9 },
-      },
-    ];
-
-    this.poleChart?.setOption({
-      animation: true,
-      animationDuration: 300,
-      grid: { top: 30, right: 60, bottom: 50, left: 50 },
-      tooltip: { trigger: 'axis', ...TOOLTIP_STYLE },
-      legend: { data: ['Energy', 'AQI', 'Noise'], textStyle: { color: CT.legendText, fontSize: 10 }, top: 0 },
-      xAxis: { type: 'time' as const, boundaryGap: false as const, axisLabel: { ...AXIS_LABEL, formatter: timeFmt }, axisLine: AXIS_LINE },
-      yAxis: [
-        { type: 'value', name: 'Energy (W)', axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE, nameTextStyle: { color: CT.axisLabel } },
-        { type: 'value', name: 'AQI / Noise', axisLabel: AXIS_LABEL, splitLine: { show: false }, nameTextStyle: { color: CT.axisLabel } },
-      ],
-      dataZoom,
-      radar: undefined,
-      series: [
-        { name: 'Energy', type: 'line', data: tp(times, this.historicalPoleData.map(d => Math.round(d.avgEnergy))), smooth: true, symbol: 'none', lineStyle: { color: CT.energy, width: 2 }, itemStyle: { color: CT.energy } },
-        { name: 'AQI', type: 'line', yAxisIndex: 1, data: tp(times, this.historicalPoleData.map(d => Math.round(d.avgAqi))), smooth: true, symbol: 'none', lineStyle: { color: CT.aqi }, itemStyle: { color: CT.aqi } },
-        { name: 'Noise', type: 'line', yAxisIndex: 1, data: tp(times, this.historicalPoleData.map(d => Math.round(d.avgNoise))), smooth: true, symbol: 'none', lineStyle: { color: CT.humidity }, itemStyle: { color: CT.humidity } },
-      ],
-    }, true);
-  }
 
   /** Returns how many simulation ticks to wait between rolling-window refreshes. */
   private getRefreshInterval(range: TimeRangeConfig): number {
