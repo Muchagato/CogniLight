@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 import httpx
 from sqlalchemy.engine import Engine
 
+from constants import POLE_ZONE_DESCRIPTIONS
 from .retriever import Retriever
 from .sql_context import build_sql_context
 
@@ -80,22 +81,8 @@ def _build_prompt(query: str, sql_context: str, rag_narratives: list[str] | None
         "midnight is anomalous. Reference the zone type when it helps explain the data."
     )
 
-    sections.append(
-        "--- POLE ZONE REFERENCE ---\n"
-        "POLE-01: Office district — busy 8-18h, dead at night\n"
-        "POLE-02: Retail strip — busy 10-20h, quiet overnight\n"
-        "POLE-03: Park — morning/evening pedestrian & cyclist peaks, empty at night\n"
-        "POLE-04: School zone — sharp peaks at 7:30-8:30 and 15-16h (drop-off/pickup), empty nights\n"
-        "POLE-05: Mall area — busy 10-21h, moderate evening, quiet overnight\n"
-        "POLE-06: Apartment complex — morning/evening rush, low daytime, some overnight\n"
-        "POLE-07: Gym — early morning (6-8h) and after-work (17-21h) peaks\n"
-        "POLE-08: Residential — morning/evening commute peaks, quiet during work hours\n"
-        "POLE-09: Cafe district — morning coffee rush (7-10h), lunch peak (12-14h), quiet at night\n"
-        "POLE-10: Mixed-use area — moderate activity throughout the day\n"
-        "POLE-11: Office tower — high vehicle traffic during commute, busy work hours, dead at night\n"
-        "POLE-12: Hotel — steady activity all day, moderate overnight presence\n"
-        "--- END REFERENCE ---"
-    )
+    zone_lines = "\n".join(f"{pid}: {desc}" for pid, desc in POLE_ZONE_DESCRIPTIONS.items())
+    sections.append(f"--- POLE ZONE REFERENCE ---\n{zone_lines}\n--- END REFERENCE ---")
 
     sections.append(sql_context)
 

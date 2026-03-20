@@ -28,9 +28,7 @@ public class SimulationEngine : IHostedService, IDisposable
     // Building type near each pole — determines activity profile
     private enum ZoneType { Office, Retail, Park, School, Mall, Apt, Cafe, Gym, Residence, Tower, Hotel, Mixed }
 
-    // Pole index → zone type mapping:
-    // P01=Office, P02=Retail, P03=Park, P04=School, P05=Mall, P06=Apt,
-    // P07=Gym, P08=Residence, P09=Mall/Cafe, P10=Mixed, P11=Tower, P12=Hotel
+    // Pole index → zone type mapping
     private static readonly ZoneType[] PoleZones =
     [
         ZoneType.Office, ZoneType.Retail, ZoneType.Park, ZoneType.School,
@@ -39,6 +37,26 @@ public class SimulationEngine : IHostedService, IDisposable
         ZoneType.Cafe, ZoneType.Mixed,
         ZoneType.Tower, ZoneType.Hotel,
     ];
+
+    /// <summary>Canonical zone display names, used by IncidentLogGenerator and API responses.</summary>
+    private static readonly Dictionary<string, string> ZoneNames = new()
+    {
+        ["POLE-01"] = "office district",
+        ["POLE-02"] = "retail strip",
+        ["POLE-03"] = "park area",
+        ["POLE-04"] = "school zone",
+        ["POLE-05"] = "mall area",
+        ["POLE-06"] = "apartment complex",
+        ["POLE-07"] = "gym area",
+        ["POLE-08"] = "residential area",
+        ["POLE-09"] = "cafe district",
+        ["POLE-10"] = "mixed-use area",
+        ["POLE-11"] = "office tower area",
+        ["POLE-12"] = "hotel area",
+    };
+
+    public static string GetZoneName(string poleId) =>
+        ZoneNames.GetValueOrDefault(poleId, "area");
 
     /// <summary>
     /// Returns (pedestrianMultiplier, vehicleMultiplier, cyclistMultiplier)
@@ -381,7 +399,8 @@ public class SimulationEngine : IHostedService, IDisposable
         {
             poleId = id,
             x = PolePositions[i].X,
-            y = PolePositions[i].Y
+            y = PolePositions[i].Y,
+            zone = GetZoneName(id)
         }).ToArray<object>();
 
     public void Dispose()

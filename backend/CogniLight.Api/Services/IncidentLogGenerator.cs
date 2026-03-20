@@ -33,21 +33,8 @@ public class IncidentLogGenerator : IHostedService, IDisposable
         "AutoDiag System", "Predictive Maintenance AI", "Control Room Operator"
     ];
 
-    private static readonly Dictionary<string, string> PoleZoneNames = new()
-    {
-        ["POLE-01"] = "office district",
-        ["POLE-02"] = "retail strip",
-        ["POLE-03"] = "park area",
-        ["POLE-04"] = "school zone",
-        ["POLE-05"] = "mall area",
-        ["POLE-06"] = "apartment complex",
-        ["POLE-07"] = "gym area",
-        ["POLE-08"] = "residential area",
-        ["POLE-09"] = "cafe district",
-        ["POLE-10"] = "mixed-use area",
-        ["POLE-11"] = "office tower area",
-        ["POLE-12"] = "hotel area",
-    };
+    // Zone names sourced from SimulationEngine (single source of truth)
+    private static string ZoneName(string poleId) => SimulationEngine.GetZoneName(poleId);
 
     public IncidentLogGenerator(
         IServiceScopeFactory scopeFactory,
@@ -143,7 +130,7 @@ public class IncidentLogGenerator : IHostedService, IDisposable
 
     private IncidentLog? GenerateAnomalyFollowUp(DateTime now, string poleId, string anomalyDesc)
     {
-        var zone = PoleZoneNames.GetValueOrDefault(poleId, "area");
+        var zone = ZoneName(poleId);
         var tech = TechnicianNames[_rng.Next(TechnicianNames.Length)];
 
         if (anomalyDesc.Contains("energy spike", StringComparison.OrdinalIgnoreCase))
@@ -228,7 +215,7 @@ public class IncidentLogGenerator : IHostedService, IDisposable
     {
         var poleIndex = _rng.Next(12);
         var poleId = $"POLE-{poleIndex + 1:D2}";
-        var zone = PoleZoneNames.GetValueOrDefault(poleId, "area");
+        var zone = ZoneName(poleId);
         var tech = TechnicianNames[_rng.Next(TechnicianNames.Length)];
 
         var type = _rng.Next(4);
