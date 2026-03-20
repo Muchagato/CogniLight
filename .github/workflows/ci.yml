@@ -16,19 +16,19 @@ jobs:
       packages: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Lowercase image base
         run: echo "IMAGE_BASE=${IMAGE_BASE,,}" >> "$GITHUB_ENV"
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push frontend
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: frontend/Dockerfile
@@ -38,7 +38,7 @@ jobs:
             ${{ env.IMAGE_BASE }}/frontend:${{ github.sha }}
 
       - name: Build and push backend
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./backend/CogniLight.Api
           push: true
@@ -47,7 +47,7 @@ jobs:
             ${{ env.IMAGE_BASE }}/backend:${{ github.sha }}
 
       - name: Build and push ai-service
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./ai-service
           push: true
