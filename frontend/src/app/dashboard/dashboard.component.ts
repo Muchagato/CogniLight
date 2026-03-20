@@ -646,14 +646,14 @@ export class DashboardComponent implements OnDestroy {
       animationDuration: 300,
       grid: { top: 36, right: 16, bottom: gridBottom, left: 50 },
       tooltip: { trigger: 'axis', ...TOOLTIP_STYLE },
-      legend: { data: ['Pedestrians', 'Vehicles', 'Cyclists'], textStyle: { color: CT.legendText, fontSize: 10 }, top: 0 },
+      legend: { data: ['Ped', 'Veh', 'Cyc'], textStyle: { color: CT.legendText, fontSize: 10 }, top: 0 },
       xAxis: timeAxis,
       yAxis: { type: 'value', axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
       dataZoom,
       series: [
-        { name: 'Pedestrians', type: 'line', stack: 'traffic', data: tp(arrays.times, arrays.ped), smooth: true, symbol: 'none', areaStyle: { opacity: 0.15 }, lineStyle: { color: CT.pedestrian }, itemStyle: { color: CT.pedestrian } },
-        { name: 'Vehicles', type: 'line', stack: 'traffic', data: tp(arrays.times, arrays.veh), smooth: true, symbol: 'none', areaStyle: { opacity: 0.15 }, lineStyle: { color: CT.vehicle }, itemStyle: { color: CT.vehicle } },
-        { name: 'Cyclists', type: 'line', stack: 'traffic', data: tp(arrays.times, arrays.cyc), smooth: true, symbol: 'none', areaStyle: { opacity: 0.15 }, lineStyle: { color: CT.cyclist }, itemStyle: { color: CT.cyclist } },
+        { name: 'Ped', type: 'line', stack: 'traffic', data: tp(arrays.times, arrays.ped), smooth: true, symbol: 'none', areaStyle: { opacity: 0.15 }, lineStyle: { color: CT.pedestrian }, itemStyle: { color: CT.pedestrian } },
+        { name: 'Veh', type: 'line', stack: 'traffic', data: tp(arrays.times, arrays.veh), smooth: true, symbol: 'none', areaStyle: { opacity: 0.15 }, lineStyle: { color: CT.vehicle }, itemStyle: { color: CT.vehicle } },
+        { name: 'Cyc', type: 'line', stack: 'traffic', data: tp(arrays.times, arrays.cyc), smooth: true, symbol: 'none', areaStyle: { opacity: 0.15 }, lineStyle: { color: CT.cyclist }, itemStyle: { color: CT.cyclist } },
       ],
     }, notMerge);
 
@@ -662,7 +662,7 @@ export class DashboardComponent implements OnDestroy {
       animationDuration: 300,
       grid: { top: 36, right: 50, bottom: gridBottom, left: 50 },
       tooltip: { trigger: 'axis', ...TOOLTIP_STYLE },
-      legend: { data: ['Temp', 'Humidity', 'AQI', 'Noise'], textStyle: { color: CT.legendText, fontSize: 10 }, top: 0 },
+      legend: { data: ['Temp', 'Hum', 'AQI', 'Noise'], textStyle: { color: CT.legendText, fontSize: 10 }, top: 0 },
       xAxis: timeAxis,
       yAxis: [
         { type: 'value', axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
@@ -671,7 +671,7 @@ export class DashboardComponent implements OnDestroy {
       dataZoom,
       series: [
         { name: 'Temp', type: 'line', data: tp(arrays.times, arrays.temp), smooth: true, symbol: 'none', lineStyle: { color: CT.temperature }, itemStyle: { color: CT.temperature } },
-        { name: 'Humidity', type: 'line', data: tp(arrays.times, arrays.humidity), smooth: true, symbol: 'none', lineStyle: { color: CT.humidity }, itemStyle: { color: CT.humidity } },
+        { name: 'Hum', type: 'line', data: tp(arrays.times, arrays.humidity), smooth: true, symbol: 'none', lineStyle: { color: CT.humidity }, itemStyle: { color: CT.humidity } },
         { name: 'AQI', type: 'line', yAxisIndex: 1, data: tp(arrays.times, arrays.aqi), smooth: true, symbol: 'none', lineStyle: { color: CT.aqi }, itemStyle: { color: CT.aqi } },
         { name: 'Noise', type: 'line', yAxisIndex: 1, data: tp(arrays.times, arrays.noise), smooth: true, symbol: 'none', lineStyle: { color: CT.noise }, itemStyle: { color: CT.noise } },
       ],

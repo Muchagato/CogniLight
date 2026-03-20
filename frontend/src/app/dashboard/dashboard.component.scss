@@ -274,7 +274,7 @@
 // --- Detail Row ---
 .detail-row {
   display: grid;
-  grid-template-columns: 1fr 380px;
+  grid-template-columns: 1fr minmax(0, 380px);
   gap: 12px;
   flex: 1;
   min-height: 0;
@@ -389,6 +389,7 @@
   flex-direction: column;
   gap: 12px;
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -399,6 +400,7 @@
   padding: 16px;
   flex: 1;
   min-height: 0;
+  min-width: 0;
   box-shadow: var(--cl-shadow-sm);
   display: flex;
   flex-direction: column;
@@ -510,6 +512,7 @@
   padding: 16px;
   flex: 1;
   min-height: 0;
+  min-width: 0;
   box-shadow: var(--cl-shadow-sm);
   display: flex;
   flex-direction: column;
