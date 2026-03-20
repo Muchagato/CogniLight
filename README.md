@@ -54,14 +54,7 @@ pip install -r requirements.txt
 uvicorn main:app --port 8000
 ```
 
-The AI service reads telemetry from the backend's SQLite database and provides RAG-powered chat. Works in demo mode without an LLM API key.
-
-To use a real LLM, set environment variables:
-```bash
-export LLM_API_KEY=your-key-here
-export LLM_BASE_URL=https://api.openai.com/v1  # or any OpenAI-compatible endpoint
-export LLM_MODEL=gpt-4o-mini
-```
+The AI service reads telemetry from the backend's SQLite database and provides RAG-powered chat. Configure your LLM API key in the chat panel's settings (BYOK — Bring Your Own Key). Supports Anthropic and OpenAI-compatible providers.
 
 ### Docker Compose
 
@@ -107,6 +100,18 @@ Each pole generates every simulation tick:
 ### Theming
 - Dark theme (charcoal/navy) with amber and cyan accents
 - Centralized color definitions: CSS custom properties (`theme.scss`), canvas renderer constants (`renderer/theme.ts`), ECharts constants (`shared/chart-theme.ts`)
+
+## Documentation
+
+Full technical documentation is available at `/docs` when running the application, or locally via:
+
+```bash
+cd docs
+pip install -r requirements.txt
+mkdocs serve -a localhost:8080
+```
+
+Covers architecture, data flow, design decisions, API reference, and lessons learned.
 
 ## Tech Stack
 
