@@ -492,6 +492,115 @@
   text-align: center;
 }
 
+// --- Incident Logs ---
+.incident-log-panel {
+  background: var(--cl-bg-raised);
+  border: 1px solid var(--cl-border);
+  border-radius: var(--cl-radius);
+  padding: 16px;
+  flex: 1;
+  min-height: 0;
+  box-shadow: var(--cl-shadow-sm);
+  display: flex;
+  flex-direction: column;
+
+  h3 {
+    margin: 0 0 10px;
+    font-size: 13px;
+    color: var(--cl-text-muted);
+    font-weight: 600;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+.incident-count-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--cl-bg-base);
+  background: var(--cl-cyan);
+  padding: 1px 7px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.incident-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.incident-entry {
+  padding: 10px 8px;
+  margin: 0 -8px;
+  border-bottom: 1px solid var(--cl-border-subtle);
+  transition: background 0.15s;
+  border-radius: 4px;
+
+  &:hover {
+    background: var(--cl-bg-hover);
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.incident-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.incident-category {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+
+  &.cat-repair     { background: rgba(239, 68, 68, 0.15); color: var(--cl-red); }
+  &.cat-incident   { background: rgba(234, 179, 8, 0.15); color: var(--cl-warning); }
+  &.cat-inspection { background: rgba(34, 211, 238, 0.15); color: var(--cl-cyan); }
+  &.cat-maintenance { background: rgba(245, 158, 11, 0.15); color: var(--cl-amber); }
+  &.cat-scheduled  { background: rgba(100, 116, 139, 0.15); color: var(--cl-text-faint); }
+}
+
+.incident-pole {
+  color: var(--cl-cyan);
+  font-weight: 600;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.incident-time {
+  color: var(--cl-text-faint);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.incident-author {
+  font-size: 11px;
+  color: var(--cl-text-faint);
+  margin-bottom: 4px;
+  font-style: italic;
+}
+
+.incident-text {
+  font-size: 12px;
+  color: var(--cl-text-secondary);
+  line-height: 1.5;
+}
+
 // Responsive
 @media (max-width: 1200px) {
   .kpi-row {

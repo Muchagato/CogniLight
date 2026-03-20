@@ -6,6 +6,12 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Suppress noisy EF Core and SignalR logs
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Update", LogLevel.Warning);
+builder.Logging.AddFilter("Microsoft.AspNetCore.SignalR", LogLevel.Warning);
+builder.Logging.AddFilter("Microsoft.AspNetCore.Http.Connections", LogLevel.Warning);
+
 // Database
 var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? "Data Source=cognilight.db";
@@ -15,6 +21,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Services
 builder.Services.AddSingleton<TelemetryService>();
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<IncidentLogGenerator>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<IncidentLogGenerator>());
 builder.Services.AddSingleton<SimulationEngine>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<SimulationEngine>());
 
@@ -34,11 +42,26 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Ensure database is created, prune data older than 3 days
+// Ensure database is created, add missing tables, prune old data
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+
+    // EnsureCreated won't add new tables to an existing DB — create manually if missing
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS IncidentLogs (
+            Id INTEGER PRIMARY KEY AUTOINCREMENT,
+            Timestamp TEXT NOT NULL,
+            PoleId TEXT NOT NULL,
+            Author TEXT NOT NULL,
+            Category TEXT NOT NULL,
+            Text TEXT NOT NULL
+        )
+    """);
+    db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_IncidentLogs_PoleId ON IncidentLogs (PoleId)");
+    db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_IncidentLogs_Timestamp ON IncidentLogs (Timestamp)");
+
     var cutoff = DateTime.UtcNow.AddDays(-3);
     db.TelemetryReadings.Where(r => r.Timestamp < cutoff).ExecuteDelete();
 }
@@ -87,6 +110,27 @@ api.MapGet("/telemetry/anomalies/range", async (string from, string to, int? lim
         poleId = a.PoleId,
         description = a.AnomalyDescription ?? ""
     });
+});
+
+api.MapGet("/incidents", async (int? limit, string? from, string? to, AppDbContext db) =>
+{
+    var query = db.IncidentLogs.AsQueryable();
+
+    if (from != null && to != null)
+    {
+        var fromDt = DateTime.Parse(from, null, System.Globalization.DateTimeStyles.RoundtripKind);
+        var toDt = DateTime.Parse(to, null, System.Globalization.DateTimeStyles.RoundtripKind);
+        query = query.Where(l => l.Timestamp >= fromDt && l.Timestamp <= toDt);
+    }
+
+    return await query
+        .OrderByDescending(l => l.Timestamp)
+        .Take(limit ?? 50)
+        .Select(l => new
+        {
+            l.Id, l.Timestamp, l.PoleId, l.Author, l.Category, l.Text
+        })
+        .ToListAsync();
 });
 
 api.MapGet("/simulation/status", () =>

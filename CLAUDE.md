@@ -87,9 +87,12 @@ cognilight/
 │   ├── CogniLight.Api/
 │   │   ├── Program.cs
 │   │   ├── Models/
+│   │   │   ├── TelemetryReading.cs
+│   │   │   └── IncidentLog.cs       # Free-text maintenance/incident reports
 │   │   ├── Services/
 │   │   │   ├── SimulationEngine.cs  # IHostedService with per-pole zone activity
-│   │   │   └── TelemetryService.cs
+│   │   │   ├── TelemetryService.cs
+│   │   │   └── IncidentLogGenerator.cs  # Generates incident logs from anomalies + scheduled
 │   │   ├── Hubs/
 │   │   │   └── TelemetryHub.cs  # SignalR hub
 │   │   └── Data/
@@ -98,10 +101,13 @@ cognilight/
 │   └── Dockerfile
 ├── ai-service/                  # Python FastAPI
 │   ├── main.py
+│   ├── constants.py             # Shared POLE_ZONES, TELEMETRY_COLUMNS
 │   ├── rag/
 │   │   ├── embeddings.py
 │   │   ├── retriever.py
-│   │   └── chain.py             # RAG with pole zone context
+│   │   ├── chain.py             # Hybrid SQL+RAG prompt builder, LLM streaming
+│   │   ├── sql_context.py       # Direct SQLite queries for current state
+│   │   └── narrative.py         # Incident log ingestion into FAISS
 │   ├── anomaly/
 │   │   └── detector.py
 │   ├── requirements.txt
@@ -179,13 +185,19 @@ Use a well-supported Angular charting library: ngx-charts, Chart.js with ng2-cha
 - Chat message interface with user/assistant bubbles
 - Suggested prompts: "Summarize the last hour", "Which poles are consuming the most energy?", "Any anomalies detected?", "Compare traffic between morning and evening"
 
-### RAG Pipeline
-1. Telemetry data is periodically summarized into text chunks (e.g., every 5 minutes of simulation time)
-   - Example chunk: "Between 14:00-14:05, POLE-03 recorded 45 pedestrians, 12 vehicles, energy at 180W. AQI spiked to 95. Anomaly: unusual pedestrian cluster detected."
-2. Chunks are embedded using sentence-transformers (all-MiniLM-L6-v2)
-3. Stored in FAISS index
-4. On user query: embed query → retrieve top-k chunks → format prompt with context → send to LLM
-5. LLM generates natural language answer grounded in telemetry data
+### Hybrid SQL + RAG Pipeline
+The AI chat uses two context sources:
+1. **Direct SQL** (every query): Queries SQLite for current network state — per-pole snapshot, rankings, recent anomalies. Always included in the LLM prompt.
+2. **RAG over incident logs** (when relevant): Free-text maintenance/incident reports from technicians and automated systems are embedded (sentence-transformers/all-MiniLM-L6-v2) and stored in FAISS. Semantic search retrieves relevant logs for maintenance/incident queries.
+
+Query routing: `_needs_rag()` in `chain.py` classifies queries by keyword heuristic — maintenance/incident keywords trigger RAG, everything else uses SQL context only.
+
+Key files:
+- `ai-service/rag/sql_context.py` — Direct DB queries for current state
+- `ai-service/rag/chain.py` — Query classifier, prompt builder, LLM streaming
+- `ai-service/rag/retriever.py` — FAISS vector search
+- `ai-service/rag/narrative.py` — Incident log ingestion into FAISS
+- `ai-service/constants.py` — Shared POLE_ZONES and column definitions
 
 ### Demo Mode (no API key)
 - If no LLM API key is configured, use pre-canned responses that demonstrate the interface
@@ -247,8 +259,22 @@ To change the theme, edit these three files. All component styles reference CSS 
 3. Smooth animations and transitions
 4. Code cleanup, comments on key decisions
 
+## Incident Log System
+
+The backend generates realistic free-text maintenance/incident reports via `IncidentLogGenerator`:
+- **Anomaly follow-ups** (~40% of anomalies): Technician responds to energy spike, sensor dropout, crowd cluster, or AQI alert with detailed findings and actions taken.
+- **Scheduled entries** (every ~2 hours): Routine inspections, predictive maintenance flags, sensor cleaning, automated diagnostics.
+- Stored in `IncidentLogs` SQLite table, broadcast via SignalR `IncidentLog` event.
+- Displayed in dashboard side panel (separate from anomaly log).
+- Ingested into FAISS by the Python AI service for RAG semantic search.
+
 ## Key Implementation Notes
 
+- **EF Core `EnsureCreated()` limitation**: Won't add new tables to an existing DB. When adding new entities, also add `CREATE TABLE IF NOT EXISTS` in Program.cs startup.
+- **SQLite timestamp format**: .NET writes `2026-03-19 22:53:10.1797267` (space-separated, 7-digit fractional). Python `%f` only handles 6 digits — truncate before parsing.
+- **Anomaly detector key casing**: `anomaly/detector.py` expects camelCase keys; SQLite columns are PascalCase. Normalize when passing readings to `detect_anomalies()`.
+- **Real-time data pattern**: All live data flows through SignalR (telemetry, anomalies, incident logs). Never poll for data that can be pushed. REST is only for historical range queries.
+- **Backend log noise**: EF Core and SignalR log at Information level every tick. Filtered in Program.cs via `builder.Logging.AddFilter()`.
 - The simulation engine should run as a hosted background service in .NET (IHostedService)
 - Use SignalR for real-time telemetry push — NOT polling
 - The Angular app should use RxJS extensively for reactive data streams

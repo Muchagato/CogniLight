@@ -22,6 +22,15 @@ export interface AnomalyEvent {
   description: string;
 }
 
+export interface IncidentLog {
+  id: number;
+  timestamp: string;
+  poleId: string;
+  author: string;
+  category: string;
+  text: string;
+}
+
 export interface HistoryBucket {
   bucketStart: string;
   totalEnergy: number;
@@ -80,12 +89,14 @@ export class TelemetryService implements OnDestroy {
   private readonly connectionStatusSubject = new BehaviorSubject<boolean>(false);
   private readonly historySubject = new BehaviorSubject<AggregateSnapshot[]>([]);
   private readonly anomaliesSubject = new BehaviorSubject<AnomalyEvent[]>([]);
+  private readonly incidentLogsSubject = new BehaviorSubject<IncidentLog[]>([]);
 
   readonly readings$ = this.readingsSubject.asObservable();
   readonly simulationTime$ = this.simulationTimeSubject.asObservable();
   readonly connected$ = this.connectionStatusSubject.asObservable();
   readonly history$ = this.historySubject.asObservable();
   readonly anomalies$ = this.anomaliesSubject.asObservable();
+  readonly incidentLogs$ = this.incidentLogsSubject.asObservable();
 
   private readonly selectedPoleSubject = new BehaviorSubject<string | null>(null);
   readonly selectedPoleId$ = this.selectedPoleSubject.asObservable();
@@ -93,6 +104,7 @@ export class TelemetryService implements OnDestroy {
   private readonly destroy$ = new Subject<void>();
   private history: AggregateSnapshot[] = [];
   private anomalyLog: AnomalyEvent[] = [];
+  private incidentLog: IncidentLog[] = [];
 
   constructor() {
     this.hubConnection = new signalR.HubConnectionBuilder()
@@ -105,6 +117,13 @@ export class TelemetryService implements OnDestroy {
         this.readingsSubject.next(data.readings);
         this.simulationTimeSubject.next(data.simulationTime);
         this.recordSnapshot(data);
+      });
+    });
+
+    this.hubConnection.on('IncidentLog', (log: IncidentLog) => {
+      this.zone.run(() => {
+        this.incidentLog = [log, ...this.incidentLog].slice(0, 50);
+        this.incidentLogsSubject.next(this.incidentLog);
       });
     });
 
@@ -177,6 +196,18 @@ export class TelemetryService implements OnDestroy {
   async getAnomaliesInRange(from: string, to: string, limit = 200, signal?: AbortSignal): Promise<AnomalyEvent[]> {
     const params = new URLSearchParams({ from, to, limit: String(limit) });
     const resp = await fetch(`${this.apiBase}/telemetry/anomalies/range?${params}`, { signal });
+    return resp.json();
+  }
+
+  async getIncidentLogs(limit = 20, signal?: AbortSignal): Promise<IncidentLog[]> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    const resp = await fetch(`${this.apiBase}/incidents?${params}`, { signal });
+    return resp.json();
+  }
+
+  async getIncidentLogsInRange(from: string, to: string, limit = 50, signal?: AbortSignal): Promise<IncidentLog[]> {
+    const params = new URLSearchParams({ from, to, limit: String(limit) });
+    const resp = await fetch(`${this.apiBase}/incidents?${params}`, { signal });
     return resp.json();
   }
 

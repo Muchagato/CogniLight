@@ -1,4 +1,4 @@
-"""FAISS-based vector retriever for telemetry summaries."""
+"""FAISS-based vector retriever for incident logs."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

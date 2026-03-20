@@ -112,6 +112,10 @@ import { LayoutService } from '../shared/services/layout.service';
       background: var(--cl-bg-raised);
       overflow: hidden;
 
+      &[hidden] {
+        display: none;
+      }
+
       &.fullscreen {
         flex: 1;
         width: auto;

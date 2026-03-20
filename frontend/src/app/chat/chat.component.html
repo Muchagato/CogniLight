@@ -2,7 +2,13 @@
   <div class="chat-header">
     <span class="chat-title">CogniLight AI</span>
     <span class="chat-subtitle">RAG-powered analysis</span>
-    <button class="chat-expand" (click)="layout.toggleChatFullscreen()" [title]="layout.chatFullscreen() ? 'Exit fullscreen' : 'Fullscreen'">
+    <button class="chat-header-btn" (click)="newChat()" title="New chat">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+    </button>
+    <button class="chat-header-btn" (click)="layout.toggleChatFullscreen()" [title]="layout.chatFullscreen() ? 'Exit fullscreen' : 'Fullscreen'">
       @if (layout.chatFullscreen()) {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="4 14 10 14 10 20"/>
@@ -62,36 +68,92 @@
           }
         </div>
 
-        @if (msg.sources && msg.sources.length > 0 && !msg.streaming) {
+        @if (!msg.streaming && (msg.sqlQueries?.length || msg.sources?.length)) {
           <div class="sources-section">
-            <button class="sources-toggle" (click)="msg.sourcesOpen = !msg.sourcesOpen">
-              <svg class="sources-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-              </svg>
-              <span>{{ msg.sources.length }} telemetry sources</span>
-              <svg class="sources-chevron" [class.open]="msg.sourcesOpen" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="9 18 15 12 9 6"/>
-              </svg>
-            </button>
-            @if (msg.sourcesOpen) {
-              <div class="sources-cards">
-                @for (src of msg.sources; track $index) {
-                  <div class="source-card">
-                    <div class="source-card-header">
-                      <span class="source-time">{{ src.timestamp }}</span>
-                      <div class="source-poles">
-                        @for (pole of src.poleIds; track pole) {
-                          <span class="pole-tag">{{ pole }}</span>
-                        }
-                      </div>
+            @if (msg.sqlQueries && msg.sqlQueries.length > 0) {
+              <button class="sources-toggle sql" (click)="msg.sqlOpen = !msg.sqlOpen">
+                <svg class="sources-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                  <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                  <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                </svg>
+                <span>{{ msg.sqlQueries.length }} SQL queries</span>
+                <svg class="sources-chevron" [class.open]="msg.sqlOpen" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </button>
+              @if (msg.sqlOpen) {
+                <div class="sources-cards">
+                  @for (q of msg.sqlQueries; track $index) {
+                    <div class="source-card sql-card" [class.expanded]="q.open">
+                      <button class="sql-card-toggle" (click)="q.open = !q.open">
+                        <div class="source-card-header">
+                          <span class="sql-label">{{ q.label }}</span>
+                          <span class="sql-rows">{{ q.rowCount }} {{ q.rowCount === 1 ? 'row' : 'rows' }}</span>
+                          <svg class="sql-expand-icon" [class.open]="q.open" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polyline points="9 18 15 12 9 6"/>
+                          </svg>
+                        </div>
+                        <div class="sql-query">{{ q.query }}</div>
+                      </button>
+                      @if (q.open && q.columns.length > 0) {
+                        <div class="sql-results">
+                          <table>
+                            <thead>
+                              <tr>
+                                @for (col of q.columns; track col) {
+                                  <th>{{ col }}</th>
+                                }
+                              </tr>
+                            </thead>
+                            <tbody>
+                              @for (row of q.rows; track $index) {
+                                <tr>
+                                  @for (cell of row; track $index) {
+                                    <td>{{ cell }}</td>
+                                  }
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
+                        </div>
+                      }
                     </div>
-                    <div class="source-card-body">{{ src.text }}</div>
-                  </div>
-                }
-              </div>
+                  }
+                </div>
+              }
+            }
+
+            @if (msg.sources && msg.sources.length > 0) {
+              <button class="sources-toggle rag" (click)="msg.sourcesOpen = !msg.sourcesOpen">
+                <svg class="sources-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                </svg>
+                <span>{{ msg.sources.length }} incident log sources</span>
+                <svg class="sources-chevron" [class.open]="msg.sourcesOpen" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </button>
+              @if (msg.sourcesOpen) {
+                <div class="sources-cards">
+                  @for (src of msg.sources; track $index) {
+                    <div class="source-card rag-card">
+                      <div class="source-card-header">
+                        <span class="source-time">{{ src.timestamp }}</span>
+                        <div class="source-poles">
+                          @for (pole of src.poleIds; track pole) {
+                            <span class="pole-tag">{{ pole }}</span>
+                          }
+                        </div>
+                      </div>
+                      <div class="source-card-body">{{ src.text }}</div>
+                    </div>
+                  }
+                </div>
+              }
             }
           </div>
         }

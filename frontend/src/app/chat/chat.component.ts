@@ -11,13 +11,24 @@ interface SourceInfo {
   poleIds: string[];
 }
 
+interface SqlQueryInfo {
+  label: string;
+  query: string;
+  rowCount: number;
+  columns: string[];
+  rows: (string | number)[][];
+  open?: boolean;
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   sources?: SourceInfo[];
+  sqlQueries?: SqlQueryInfo[];
   timestamp: Date;
   streaming?: boolean;
   sourcesOpen?: boolean;
+  sqlOpen?: boolean;
 }
 
 @Component({
@@ -37,17 +48,32 @@ export class ChatComponent {
   messages: ChatMessage[] = [];
   inputText = '';
   loading = false;
-  suggestions: string[] = [
-    'Summarize the last hour of telemetry',
-    'Which poles consume the most energy?',
-    'Any anomalies detected recently?',
-    'Compare morning vs evening traffic',
-  ];
+  suggestions: string[] = [];
 
   private readonly apiBase = 'http://localhost:8000/api';
 
+  constructor() {
+    this.loadSuggestions();
+  }
+
+  private async loadSuggestions(): Promise<void> {
+    try {
+      const resp = await fetch(`${this.apiBase}/chat/suggestions`);
+      if (resp.ok) {
+        this.suggestions = await resp.json();
+        this.cdr.detectChanges();
+      }
+    } catch { /* keep empty if service unavailable */ }
+  }
+
   toggle(): void {
     this.layout.toggleChat();
+  }
+
+  newChat(): void {
+    this.messages = [];
+    this.inputText = '';
+    this.loading = false;
   }
 
   async sendMessage(text?: string): Promise<void> {
@@ -111,7 +137,10 @@ export class ChatComponent {
 
           try {
             const data = JSON.parse(eventData);
-            if (currentEvent === 'sources') {
+            if (currentEvent === 'sql_context') {
+              assistantMsg.sqlQueries = data.queries;
+              this.detectAndScroll();
+            } else if (currentEvent === 'sources') {
               assistantMsg.sources = data.sources;
               this.detectAndScroll();
             } else if (currentEvent === 'token') {

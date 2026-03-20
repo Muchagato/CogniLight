@@ -7,6 +7,7 @@ import {
   TelemetryService,
   AggregateSnapshot,
   AnomalyEvent,
+  IncidentLog,
   PoleBucket,
   TimeRangeKey,
   TIME_RANGES,
@@ -46,6 +47,7 @@ export class DashboardComponent implements OnDestroy {
   simulationTime = '';
   connected = false;
   anomalies: AnomalyEvent[] = [];
+  incidentLogs: IncidentLog[] = [];
   selectedPoleId: string | null = null;
 
   // KPI values
@@ -96,6 +98,7 @@ export class DashboardComponent implements OnDestroy {
   private refreshTickCounter = 0;
   private refreshIntervalTicks = 0;
   private refreshInFlight = false;
+
 
   // Mode tracking for notMerge
   private lastWasHistorical = false;
@@ -162,6 +165,13 @@ export class DashboardComponent implements OnDestroy {
           this.anomalies = a;
           this.cdr.detectChanges();
         }
+      });
+
+    this.telemetry.incidentLogs$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(logs => {
+        this.incidentLogs = logs;
+        this.cdr.detectChanges();
       });
 
     this.telemetry.selectedPoleId$
@@ -246,6 +256,7 @@ export class DashboardComponent implements OnDestroy {
       this.refreshInFlight = false;
       this.updateKpis(this.readings);
       this.anomalies = this.telemetry['anomalyLog'] || [];
+      this.incidentLogs = this.telemetry['incidentLog'] || [];
       this.updateCharts();
       this.updatePoleChart();
       this.cdr.detectChanges();
@@ -268,9 +279,10 @@ export class DashboardComponent implements OnDestroy {
     const signal = this.abortController.signal;
 
     try {
-      const [buckets, anomalies] = await Promise.all([
+      const [buckets, anomalies, incidents] = await Promise.all([
         this.telemetry.getHistory(fromIso, toIso, range.bucket, signal),
         this.telemetry.getAnomaliesInRange(fromIso, toIso, 200, signal),
+        this.telemetry.getIncidentLogsInRange(fromIso, toIso, 50, signal),
       ]);
 
       if (signal.aborted) return;
@@ -289,6 +301,7 @@ export class DashboardComponent implements OnDestroy {
       }));
 
       this.anomalies = anomalies;
+      this.incidentLogs = incidents;
       this.updateHistoricalKpis(this.historicalData);
       this.updateCharts();
 
@@ -415,6 +428,18 @@ export class DashboardComponent implements OnDestroy {
     }
     return 'warning';
   }
+
+  getIncidentCategoryClass(category: string): string {
+    switch (category) {
+      case 'repair': return 'cat-repair';
+      case 'incident': return 'cat-incident';
+      case 'inspection': return 'cat-inspection';
+      case 'maintenance': return 'cat-maintenance';
+      case 'scheduled': return 'cat-scheduled';
+      default: return 'cat-scheduled';
+    }
+  }
+
 
   activeRangeLabel(): string {
     const r = TIME_RANGES.find(t => t.key === this.activeRange);
@@ -750,9 +775,10 @@ export class DashboardComponent implements OnDestroy {
     const signal = this.abortController.signal;
 
     try {
-      const [buckets, anomalies] = await Promise.all([
+      const [buckets, anomalies, incidents] = await Promise.all([
         this.telemetry.getHistory(fromIso, toIso, range.bucket, signal),
         this.telemetry.getAnomaliesInRange(fromIso, toIso, 200, signal),
+        this.telemetry.getIncidentLogsInRange(fromIso, toIso, 50, signal),
       ]);
 
       if (signal.aborted) return;
@@ -771,6 +797,7 @@ export class DashboardComponent implements OnDestroy {
       }));
 
       this.anomalies = anomalies;
+      this.incidentLogs = incidents;
       this.updateHistoricalKpis(this.historicalData);
       this.updateCharts();
 

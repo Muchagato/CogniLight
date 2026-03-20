@@ -1,4 +1,4 @@
-"""CogniLight AI Service — RAG over telemetry + anomaly detection."""
+"""CogniLight AI Service — hybrid SQL + RAG over incident logs + anomaly detection."""
 from __future__ import annotations
 
 import asyncio
@@ -10,7 +10,6 @@ from typing import Any
 from dotenv import load_dotenv
 
 # Load .env BEFORE importing modules that read env vars at import time
-# Search parent directories so it finds the project-root .env
 from pathlib import Path
 _env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(_env_path)
@@ -25,8 +24,10 @@ from sqlalchemy import create_engine, text  # noqa: E402
 from sse_starlette.sse import EventSourceResponse  # noqa: E402
 
 from anomaly.detector import detect_anomalies, summarize_anomalies, AnomalyReport  # noqa: E402
+from constants import TELEMETRY_COLUMNS  # noqa: E402
 from rag.chain import generate_response, generate_response_stream, is_llm_configured  # noqa: E402
-from rag.retriever import Chunk, Retriever  # noqa: E402
+from rag.narrative import load_persisted_incidents, ingest_new_incidents  # noqa: E402
+from rag.retriever import Retriever  # noqa: E402
 
 DB_PATH = os.getenv("DATABASE_PATH", "../backend/CogniLight.Api/cognilight.db")
 INGEST_INTERVAL = int(os.getenv("INGEST_INTERVAL", "10"))  # seconds
@@ -38,120 +39,93 @@ else:
 
 retriever = Retriever()
 _latest_anomalies: list[AnomalyReport] = []
-_last_ingested_id: int = 0
-
-# Pole-to-zone mapping — mirrors backend SimulationEngine.PoleZones
-POLE_ZONES: dict[str, str] = {
-    "POLE-01": "Office",
-    "POLE-02": "Retail",
-    "POLE-03": "Park",
-    "POLE-04": "School",
-    "POLE-05": "Mall",
-    "POLE-06": "Apartment",
-    "POLE-07": "Gym",
-    "POLE-08": "Residential",
-    "POLE-09": "Cafe",
-    "POLE-10": "Mixed-use",
-    "POLE-11": "Tower",
-    "POLE-12": "Hotel",
-}
+_last_incident_id: int = 0
+_last_anomaly_id: int = 0
 
 
 def _get_engine():
     return create_engine(f"sqlite:///{DB_PATH}", echo=False)
 
 
-def _ingest_new_readings() -> int:
-    """Read new telemetry from SQLite and add summarized chunks to FAISS."""
-    global _last_ingested_id, _latest_anomalies
+engine = _get_engine()
+
+
+def _ingest_anomalies() -> None:
+    """Detect anomalies from recent readings."""
+    global _last_anomaly_id, _latest_anomalies
 
     try:
-        engine = _get_engine()
         with engine.connect() as conn:
             rows = conn.execute(
                 text(
-                    "SELECT * FROM TelemetryReadings WHERE Id > :last_id ORDER BY Id LIMIT 500"
+                    "SELECT * FROM TelemetryReadings WHERE Id > :last_id ORDER BY Id LIMIT 6000"
                 ),
-                {"last_id": _last_ingested_id},
+                {"last_id": _last_anomaly_id},
             ).fetchall()
 
             if not rows:
-                return 0
+                return
 
-            columns = [
-                "Id", "PoleId", "Timestamp", "EnergyWatts", "PedestrianCount",
-                "VehicleCount", "CyclistCount", "AmbientLightLux", "TemperatureC",
-                "HumidityPct", "AirQualityAqi", "NoiseDb", "LightLevelPct",
-                "AnomalyFlag", "AnomalyDescription",
+            readings: list[dict[str, Any]] = [dict(zip(TELEMETRY_COLUMNS, row)) for row in rows]
+            _last_anomaly_id = max(r["Id"] for r in readings)
+
+            # Normalize keys to camelCase for the anomaly detector
+            camel_readings = [
+                {
+                    "poleId": r["PoleId"],
+                    "timestamp": r["Timestamp"],
+                    "energyWatts": r["EnergyWatts"],
+                    "pedestrianCount": r["PedestrianCount"],
+                    "vehicleCount": r["VehicleCount"],
+                    "cyclistCount": r["CyclistCount"],
+                    "ambientLightLux": r["AmbientLightLux"],
+                    "temperatureC": r["TemperatureC"],
+                    "humidityPct": r["HumidityPct"],
+                    "airQualityAqi": r["AirQualityAqi"],
+                    "noiseDb": r["NoiseDb"],
+                    "lightLevelPct": r["LightLevelPct"],
+                    "anomalyFlag": r["AnomalyFlag"],
+                    "anomalyDescription": r["AnomalyDescription"],
+                }
+                for r in readings
             ]
-            readings: list[dict[str, Any]] = [dict(zip(columns, row)) for row in rows]
-            _last_ingested_id = max(r["Id"] for r in readings)
 
-            # Detect anomalies
-            _latest_anomalies = detect_anomalies(readings)
-
-            # Group readings by timestamp for summarization
-            by_time: dict[str, list[dict[str, Any]]] = {}
-            for r in readings:
-                ts = r["Timestamp"]
-                by_time.setdefault(ts, []).append(r)
-
-            chunks: list[Chunk] = []
-            for ts, group in by_time.items():
-                summary = _summarize_group(ts, group)
-                pole_ids = [r["PoleId"] for r in group]
-                chunks.append(Chunk(text=summary, timestamp=ts, pole_ids=pole_ids))
-
-            retriever.add_chunks(chunks)
-            return len(chunks)
+            new_anomalies = detect_anomalies(camel_readings)
+            if new_anomalies:
+                _latest_anomalies = new_anomalies + _latest_anomalies
+                _latest_anomalies = _latest_anomalies[:100]
     except Exception:
-        return 0
+        logger.exception("Anomaly ingestion failed")
 
 
-def _summarize_group(timestamp: str, readings: list[dict[str, Any]]) -> str:
-    """Create a text summary of a group of readings at the same timestamp."""
-    total_energy = sum(r["EnergyWatts"] for r in readings)
-    total_ped = sum(r["PedestrianCount"] for r in readings)
-    total_veh = sum(r["VehicleCount"] for r in readings)
-    total_cyc = sum(r["CyclistCount"] for r in readings)
-    avg_aqi = sum(r["AirQualityAqi"] for r in readings) // len(readings)
-    avg_temp = sum(r["TemperatureC"] for r in readings) / len(readings)
+def _ingest_incidents() -> int:
+    """Ingest new incident logs from SQLite into FAISS."""
+    global _last_incident_id
 
-    anomalies = [r for r in readings if r["AnomalyFlag"]]
-    anomaly_text = ""
-    if anomalies:
-        descs = [r["AnomalyDescription"] for r in anomalies if r["AnomalyDescription"]]
-        anomaly_text = " Anomalies: " + "; ".join(descs) + "."
-
-    # Per-pole details with zone context
-    pole_parts: list[str] = []
-    for r in readings:
-        zone = POLE_ZONES.get(r["PoleId"], "Unknown")
-        pole_parts.append(
-            f"{r['PoleId']} ({zone}): {r['EnergyWatts']:.0f}W, "
-            f"{r['PedestrianCount']} ped, {r['VehicleCount']} veh, "
-            f"{r['CyclistCount']} cyc, AQI {r['AirQualityAqi']}"
-        )
-
-    pole_detail = " Poles: " + "; ".join(pole_parts) + "."
-
-    return (
-        f"At {timestamp}: network total {total_energy:.0f}W, "
-        f"{total_ped} pedestrians, {total_veh} vehicles, {total_cyc} cyclists. "
-        f"Avg AQI {avg_aqi}, temp {avg_temp:.1f}C."
-        f"{anomaly_text}{pole_detail}"
-    )
+    chunks, new_id = ingest_new_incidents(engine, _last_incident_id)
+    if chunks:
+        retriever.add_chunks(chunks)
+        _last_incident_id = new_id
+    return len(chunks)
 
 
 async def _ingest_loop():
-    """Background task that periodically ingests new readings."""
+    """Background task that periodically ingests new data."""
     while True:
-        _ingest_new_readings()
+        _ingest_incidents()
+        _ingest_anomalies()
         await asyncio.sleep(INGEST_INTERVAL)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Load previously persisted incident logs into FAISS
+    global _last_incident_id
+    persisted_chunks, last_id = load_persisted_incidents(engine)
+    if persisted_chunks:
+        retriever.add_chunks(persisted_chunks)
+        _last_incident_id = last_id
+
     task = asyncio.create_task(_ingest_loop())
     yield
     task.cancel()
@@ -177,6 +151,20 @@ async def chat_status() -> dict[str, bool]:
     return {"configured": is_llm_configured()}
 
 
+@app.get("/api/debug/chunks")
+async def debug_chunks(limit: int = 20, offset: int = 0):
+    """Inspect incident log chunks stored in the FAISS index."""
+    chunks = retriever.chunks[offset:offset + limit]
+    return {
+        "total": len(retriever.chunks),
+        "showing": f"{offset}-{offset + len(chunks)}",
+        "chunks": [
+            {"timestamp": c.timestamp, "poleIds": c.pole_ids, "text": c.text}
+            for c in chunks
+        ],
+    }
+
+
 # --- Chat ---
 
 class ChatRequest(BaseModel):
@@ -190,7 +178,7 @@ class ChatResponse(BaseModel):
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest) -> ChatResponse:
-    reply, sources = await generate_response(request.message, retriever)
+    reply, sources = await generate_response(request.message, retriever, engine)
     return ChatResponse(reply=reply, sources=sources)
 
 
@@ -199,7 +187,7 @@ async def chat_stream(request: ChatRequest):
     import json
 
     async def event_generator():
-        async for event in generate_response_stream(request.message, retriever):
+        async for event in generate_response_stream(request.message, retriever, engine):
             yield {"event": event["event"], "data": json.dumps(event["data"])}
 
     return EventSourceResponse(event_generator())
@@ -233,8 +221,9 @@ async def recent_anomalies() -> list[dict[str, str]]:
 async def chat_suggestions() -> list[str]:
     return [
         "Summarize the last hour of telemetry",
-        "Which poles are consuming the most energy?",
-        "Any anomalies detected recently?",
-        "Compare traffic between morning and evening",
+        "Which poles are consuming the most energy right now?",
+        "Any maintenance issues or incidents reported recently?",
+        "Have there been any recurring sensor problems?",
         "What's the current air quality across the network?",
+        "Which poles have had repairs done?",
     ]

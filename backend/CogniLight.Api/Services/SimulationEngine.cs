@@ -8,6 +8,7 @@ public class SimulationEngine : IHostedService, IDisposable
 {
     private readonly IHubContext<TelemetryHub> _hubContext;
     private readonly TelemetryService _telemetryService;
+    private readonly IncidentLogGenerator _incidentLogGenerator;
     private readonly ILogger<SimulationEngine> _logger;
     private Timer? _timer;
     private readonly Random _rng = new(42);
@@ -151,10 +152,12 @@ public class SimulationEngine : IHostedService, IDisposable
     public SimulationEngine(
         IHubContext<TelemetryHub> hubContext,
         TelemetryService telemetryService,
+        IncidentLogGenerator incidentLogGenerator,
         ILogger<SimulationEngine> logger)
     {
         _hubContext = hubContext;
         _telemetryService = telemetryService;
+        _incidentLogGenerator = incidentLogGenerator;
         _logger = logger;
 
         // Initialize pole states with reasonable defaults
@@ -290,6 +293,12 @@ public class SimulationEngine : IHostedService, IDisposable
             var spike = Math.Max(3, (int)(basePed * _rng.Next(3, 6)));
             ps.Pedestrians += spike;
             pedestrians += spike;
+        }
+
+        // Notify incident log generator so it can create follow-up entries
+        if (anomalyFlag && anomalyDesc != null)
+        {
+            _incidentLogGenerator.OnAnomalyDetected(timestamp, poleId, anomalyDesc);
         }
 
         return new TelemetryReading

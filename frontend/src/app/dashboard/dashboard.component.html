@@ -179,6 +179,32 @@
           }
         </div>
       </div>
+
+      <!-- Incident Logs -->
+      <div class="incident-log-panel">
+        <h3>
+          Incident Logs
+          @if (incidentLogs.length > 0) {
+            <span class="incident-count-badge">{{ incidentLogs.length }}</span>
+          }
+        </h3>
+        <div class="incident-list">
+          @for (log of incidentLogs; track log.id) {
+            <div class="incident-entry">
+              <div class="incident-header">
+                <span class="incident-category" [ngClass]="getIncidentCategoryClass(log.category)">{{ log.category }}</span>
+                <span class="incident-pole">{{ log.poleId }}</span>
+                <span class="incident-time">{{ formatTime(log.timestamp) }}</span>
+              </div>
+              <div class="incident-author">{{ log.author }}</div>
+              <div class="incident-text">{{ log.text }}</div>
+            </div>
+          }
+          @if (incidentLogs.length === 0) {
+            <div class="empty-state">No incident logs yet.</div>
+          }
+        </div>
+      </div>
     </div>
   </div>
 </div>
