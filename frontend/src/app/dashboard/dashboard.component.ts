@@ -253,52 +253,19 @@ export class DashboardComponent implements OnDestroy {
     }
 
     const range = TIME_RANGES.find(r => r.key === key)!;
-    const now = this.simulationTime ? new Date(this.simulationTime) : new Date();
-    const from = new Date(now.getTime() - range.duration * 1000);
-    const fromIso = from.toISOString();
-    const toIso = now.toISOString();
 
-    this.rangeLabel = this.formatRangeLabel(from, now, range);
     this.loading = true;
     this.showChartLoading();
     this.cdr.detectChanges();
 
-    this.abortController?.abort();
-    this.abortController = new AbortController();
-    const signal = this.abortController.signal;
-
     try {
-      const [buckets, anomalies, incidents] = await Promise.all([
-        this.telemetry.getHistory(fromIso, toIso, range.bucket, signal),
-        this.telemetry.getAnomaliesInRange(fromIso, toIso, 200, signal),
-        this.telemetry.getIncidentLogsInRange(fromIso, toIso, 50, signal),
-      ]);
+      const signal = await this.fetchAndApplyHistoricalData(range);
 
-      if (signal.aborted) return;
-
-      this.historicalData = buckets.map(b => ({
-        time: b.bucketStart,
-        totalEnergy: b.totalEnergy,
-        totalPedestrians: Math.round(b.totalPedestrians),
-        totalVehicles: Math.round(b.totalVehicles),
-        totalCyclists: Math.round(b.totalCyclists),
-        avgAqi: Math.round(b.avgAqi),
-        avgTemperature: +b.avgTemperature.toFixed(1),
-        avgHumidity: +b.avgHumidity.toFixed(1),
-        avgNoise: +b.avgNoise.toFixed(1),
-        anomalyCount: b.anomalyCount,
-      }));
-
-      this.anomalies = anomalies;
-      this.incidentLogs = incidents;
-      this.updateHistoricalKpis(this.historicalData);
-      this.updateCharts();
-
-      // If a pole is selected, also fetch its history for main charts
-      if (this.selectedPoleId) {
-        this.fetchPoleHistory();
-      }
-      this.fetchHistoricalPoleAverages(fromIso, toIso, range.bucket, signal);
+      this.fetchHistoricalPoleAverages(
+        new Date(new Date(this.simulationTime || Date.now()).getTime() - range.duration * 1000).toISOString(),
+        (this.simulationTime ? new Date(this.simulationTime) : new Date()).toISOString(),
+        range.bucket, signal
+      );
 
       // Start rolling window refresh
       this.refreshTickCounter = 0;
@@ -685,11 +652,8 @@ export class DashboardComponent implements OnDestroy {
     return Math.min(Math.max(range.bucket, 5), 120);
   }
 
-  /** Re-fetch historical data with the current simulation time as the new window edge. */
-  private async refreshHistoricalWindow(): Promise<void> {
-    const range = TIME_RANGES.find(r => r.key === this.activeRange);
-    if (!range || range.key === 'live') return;
-
+  /** Shared fetch logic for historical data — used by onRangeChange and rolling refresh. */
+  private async fetchAndApplyHistoricalData(range: TimeRangeConfig): Promise<AbortSignal> {
     const now = this.simulationTime ? new Date(this.simulationTime) : new Date();
     const from = new Date(now.getTime() - range.duration * 1000);
     const fromIso = from.toISOString();
@@ -701,38 +665,47 @@ export class DashboardComponent implements OnDestroy {
     this.abortController = new AbortController();
     const signal = this.abortController.signal;
 
+    const [buckets, anomalies, incidents] = await Promise.all([
+      this.telemetry.getHistory(fromIso, toIso, range.bucket, signal),
+      this.telemetry.getAnomaliesInRange(fromIso, toIso, 200, signal),
+      this.telemetry.getIncidentLogsInRange(fromIso, toIso, 50, signal),
+    ]);
+
+    if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+
+    this.historicalData = buckets.map(b => ({
+      time: b.bucketStart,
+      totalEnergy: b.totalEnergy,
+      totalPedestrians: Math.round(b.totalPedestrians),
+      totalVehicles: Math.round(b.totalVehicles),
+      totalCyclists: Math.round(b.totalCyclists),
+      avgAqi: Math.round(b.avgAqi),
+      avgTemperature: +b.avgTemperature.toFixed(1),
+      avgHumidity: +b.avgHumidity.toFixed(1),
+      avgNoise: +b.avgNoise.toFixed(1),
+      anomalyCount: b.anomalyCount,
+    }));
+
+    this.anomalies = anomalies;
+    this.incidentLogs = incidents;
+    this.updateHistoricalKpis(this.historicalData);
+    this.updateCharts();
+
+    if (this.selectedPoleId) {
+      this.fetchPoleHistory();
+    }
+
+    this.cdr.detectChanges();
+    return signal;
+  }
+
+  /** Re-fetch historical data with the current simulation time as the new window edge. */
+  private async refreshHistoricalWindow(): Promise<void> {
+    const range = TIME_RANGES.find(r => r.key === this.activeRange);
+    if (!range || range.key === 'live') return;
+
     try {
-      const [buckets, anomalies, incidents] = await Promise.all([
-        this.telemetry.getHistory(fromIso, toIso, range.bucket, signal),
-        this.telemetry.getAnomaliesInRange(fromIso, toIso, 200, signal),
-        this.telemetry.getIncidentLogsInRange(fromIso, toIso, 50, signal),
-      ]);
-
-      if (signal.aborted) return;
-
-      this.historicalData = buckets.map(b => ({
-        time: b.bucketStart,
-        totalEnergy: b.totalEnergy,
-        totalPedestrians: Math.round(b.totalPedestrians),
-        totalVehicles: Math.round(b.totalVehicles),
-        totalCyclists: Math.round(b.totalCyclists),
-        avgAqi: Math.round(b.avgAqi),
-        avgTemperature: +b.avgTemperature.toFixed(1),
-        avgHumidity: +b.avgHumidity.toFixed(1),
-        avgNoise: +b.avgNoise.toFixed(1),
-        anomalyCount: b.anomalyCount,
-      }));
-
-      this.anomalies = anomalies;
-      this.incidentLogs = incidents;
-      this.updateHistoricalKpis(this.historicalData);
-      this.updateCharts();
-
-      if (this.selectedPoleId) {
-        this.fetchPoleHistory();
-      }
-
-      this.cdr.detectChanges();
+      await this.fetchAndApplyHistoricalData(range);
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
         console.error('Failed to refresh historical window:', e);
