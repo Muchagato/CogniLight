@@ -95,6 +95,11 @@ export class DashboardComponent implements OnDestroy {
   private historicalTo = '';
   private abortController: AbortController | null = null;
 
+  // Log display limits (progressive loading)
+  private readonly LOG_PAGE_SIZE = 20;
+  anomalyDisplayLimit = 20;
+  incidentDisplayLimit = 20;
+
   // Rolling window refresh for historical ranges
   private refreshTickCounter = 0;
   private refreshIntervalTicks = 0;
@@ -238,6 +243,9 @@ export class DashboardComponent implements OnDestroy {
     if (key === this.activeRange) return;
     this.activeRange = key;
 
+    this.anomalyDisplayLimit = this.LOG_PAGE_SIZE;
+    this.incidentDisplayLimit = this.LOG_PAGE_SIZE;
+
     if (key === 'live') {
       this.rangeLabel = '';
       this.historicalData = [];
@@ -362,9 +370,25 @@ export class DashboardComponent implements OnDestroy {
     return this.anomalies.filter(a => a.poleId === this.selectedPoleId);
   }
 
+  get displayedAnomalies(): AnomalyEvent[] {
+    return this.filteredAnomalies.slice(0, this.anomalyDisplayLimit);
+  }
+
   get filteredIncidentLogs(): IncidentLog[] {
     if (!this.selectedPoleId) return this.incidentLogs;
     return this.incidentLogs.filter(l => l.poleId === this.selectedPoleId);
+  }
+
+  get displayedIncidentLogs(): IncidentLog[] {
+    return this.filteredIncidentLogs.slice(0, this.incidentDisplayLimit);
+  }
+
+  loadMoreAnomalies(): void {
+    this.anomalyDisplayLimit += this.LOG_PAGE_SIZE;
+  }
+
+  loadMoreIncidents(): void {
+    this.incidentDisplayLimit += this.LOG_PAGE_SIZE;
   }
 
   selectPole(poleId: string): void {
@@ -671,8 +695,8 @@ export class DashboardComponent implements OnDestroy {
 
     const [buckets, anomalies, incidents] = await Promise.all([
       this.telemetry.getHistory(fromIso, toIso, range.bucket, signal),
-      this.telemetry.getAnomaliesInRange(fromIso, toIso, 200, signal),
-      this.telemetry.getIncidentLogsInRange(fromIso, toIso, 50, signal),
+      this.telemetry.getAnomaliesInRange(fromIso, toIso, signal),
+      this.telemetry.getIncidentLogsInRange(fromIso, toIso, signal),
     ]);
 
     if (signal.aborted) throw new DOMException('Aborted', 'AbortError');

@@ -197,14 +197,13 @@ public class TelemetryService
     }
 
     public async Task<List<TelemetryReading>> GetAnomaliesInRangeAsync(
-        DateTime from, DateTime to, int limit = 200)
+        DateTime from, DateTime to)
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         return await db.TelemetryReadings
             .Where(r => r.AnomalyFlag && r.Timestamp >= from && r.Timestamp <= to)
             .OrderByDescending(r => r.Timestamp)
-            .Take(limit)
             .ToListAsync();
     }
 }

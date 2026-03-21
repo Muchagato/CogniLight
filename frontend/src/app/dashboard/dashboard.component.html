@@ -155,7 +155,7 @@
           }
         </h3>
         <div class="anomaly-list">
-          @for (a of filteredAnomalies; track $index) {
+          @for (a of displayedAnomalies; track $index) {
             <div class="anomaly-entry">
               <div class="anomaly-header">
                 <span class="anomaly-severity" [ngClass]="getAnomalySeverity(a.description)"></span>
@@ -167,6 +167,9 @@
           }
           @if (filteredAnomalies.length === 0) {
             <div class="empty-state">No anomalies detected{{ isLive ? ' yet' : ' in this period' }}.</div>
+          }
+          @if (filteredAnomalies.length > anomalyDisplayLimit) {
+            <button class="load-more-btn" (click)="loadMoreAnomalies()">Load more ({{ filteredAnomalies.length - anomalyDisplayLimit }} remaining)</button>
           }
         </div>
       </div>
@@ -181,7 +184,7 @@
           }
         </h3>
         <div class="incident-list">
-          @for (log of filteredIncidentLogs; track log.id) {
+          @for (log of displayedIncidentLogs; track log.id) {
             <div class="incident-entry">
               <div class="incident-header">
                 <span class="incident-category" [ngClass]="getIncidentCategoryClass(log.category)">{{ log.category }}</span>
@@ -194,6 +197,9 @@
           }
           @if (filteredIncidentLogs.length === 0) {
             <div class="empty-state">No incident logs{{ selectedPoleId ? ' for ' + selectedPoleId : ' yet' }}.</div>
+          }
+          @if (filteredIncidentLogs.length > incidentDisplayLimit) {
+            <button class="load-more-btn" (click)="loadMoreIncidents()">Load more ({{ filteredIncidentLogs.length - incidentDisplayLimit }} remaining)</button>
           }
         </div>
       </div>

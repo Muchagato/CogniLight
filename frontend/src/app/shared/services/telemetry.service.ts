@@ -121,7 +121,7 @@ export class TelemetryService {
 
     this.hubConnection.on('IncidentLog', (log: IncidentLog) => {
       this.zone.run(() => {
-        this.incidentLog = [log, ...this.incidentLog].slice(0, 50);
+        this.incidentLog = [log, ...this.incidentLog];
         this.incidentLogsSubject.next(this.incidentLog);
       });
     });
@@ -157,7 +157,7 @@ export class TelemetryService {
       if (reading.anomalyFlag && reading.anomalyDescription) {
         this.anomalyLog = [
           { time: data.simulationTime, poleId: reading.poleId, description: reading.anomalyDescription },
-          ...this.anomalyLog.slice(0, 49),
+          ...this.anomalyLog,
         ];
       }
     }
@@ -196,18 +196,17 @@ export class TelemetryService {
     return this.fetchJson(`${this.apiBase}/telemetry/history/${poleId}?${params}`, { signal });
   }
 
-  async getAnomaliesInRange(from: string, to: string, limit = 200, signal?: AbortSignal): Promise<AnomalyEvent[]> {
-    const params = new URLSearchParams({ from, to, limit: String(limit) });
+  async getAnomaliesInRange(from: string, to: string, signal?: AbortSignal): Promise<AnomalyEvent[]> {
+    const params = new URLSearchParams({ from, to });
     return this.fetchJson(`${this.apiBase}/telemetry/anomalies/range?${params}`, { signal });
   }
 
-  async getIncidentLogs(limit = 20, signal?: AbortSignal): Promise<IncidentLog[]> {
-    const params = new URLSearchParams({ limit: String(limit) });
-    return this.fetchJson(`${this.apiBase}/incidents?${params}`, { signal });
+  async getIncidentLogs(signal?: AbortSignal): Promise<IncidentLog[]> {
+    return this.fetchJson(`${this.apiBase}/incidents`, { signal });
   }
 
-  async getIncidentLogsInRange(from: string, to: string, limit = 50, signal?: AbortSignal): Promise<IncidentLog[]> {
-    const params = new URLSearchParams({ from, to, limit: String(limit) });
+  async getIncidentLogsInRange(from: string, to: string, signal?: AbortSignal): Promise<IncidentLog[]> {
+    const params = new URLSearchParams({ from, to });
     return this.fetchJson(`${this.apiBase}/incidents?${params}`, { signal });
   }
 }

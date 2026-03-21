@@ -10,7 +10,8 @@
   gap: 16px;
   height: 100%;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 // --- Stagger animation for panels ---
@@ -277,7 +278,7 @@
   grid-template-columns: 1fr minmax(0, 380px);
   gap: 12px;
   flex: 1;
-  min-height: 0;
+  min-height: 340px;
 }
 
 .pole-table-panel {
@@ -399,7 +400,6 @@
   gap: 12px;
   min-height: 0;
   min-width: 0;
-  overflow: hidden;
 }
 
 .anomaly-log-panel {
@@ -408,7 +408,7 @@
   border-radius: var(--cl-radius);
   padding: 16px;
   flex: 1;
-  min-height: 0;
+  min-height: 160px;
   min-width: 0;
   box-shadow: var(--cl-shadow-sm);
   display: flex;
@@ -522,7 +522,7 @@
   border-radius: var(--cl-radius);
   padding: 16px;
   flex: 1;
-  min-height: 0;
+  min-height: 160px;
   min-width: 0;
   box-shadow: var(--cl-shadow-sm);
   display: flex;
@@ -623,6 +623,25 @@
   font-size: 12px;
   color: var(--cl-text-secondary);
   line-height: 1.5;
+}
+
+.load-more-btn {
+  width: 100%;
+  padding: 6px 0;
+  margin-top: 4px;
+  background: var(--cl-bg-hover);
+  border: 1px solid var(--cl-border-subtle);
+  border-radius: 6px;
+  color: var(--cl-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+
+  &:hover {
+    background: var(--cl-border-subtle);
+    color: var(--cl-text-primary);
+  }
 }
 
 // Responsive — tablet

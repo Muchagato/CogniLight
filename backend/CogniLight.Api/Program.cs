@@ -133,11 +133,11 @@ api.MapGet("/telemetry/history/{poleId}", async (string poleId, string from, str
     return await svc.GetPoleHistoryAsync(poleId, fromDt, toDt, bucketSeconds);
 });
 
-api.MapGet("/telemetry/anomalies/range", async (string from, string to, int? limit, TelemetryService svc) =>
+api.MapGet("/telemetry/anomalies/range", async (string from, string to, TelemetryService svc) =>
 {
     var fromDt = DateTime.Parse(from, null, System.Globalization.DateTimeStyles.RoundtripKind);
     var toDt = DateTime.Parse(to, null, System.Globalization.DateTimeStyles.RoundtripKind);
-    var anomalies = await svc.GetAnomaliesInRangeAsync(fromDt, toDt, limit ?? 200);
+    var anomalies = await svc.GetAnomaliesInRangeAsync(fromDt, toDt);
     return anomalies.Select(a => new
     {
         time = a.Timestamp.ToString("o"),
@@ -146,7 +146,7 @@ api.MapGet("/telemetry/anomalies/range", async (string from, string to, int? lim
     });
 });
 
-api.MapGet("/incidents", async (int? limit, string? from, string? to, AppDbContext db) =>
+api.MapGet("/incidents", async (string? from, string? to, AppDbContext db) =>
 {
     var query = db.IncidentLogs.AsQueryable();
 
@@ -159,7 +159,6 @@ api.MapGet("/incidents", async (int? limit, string? from, string? to, AppDbConte
 
     return await query
         .OrderByDescending(l => l.Timestamp)
-        .Take(limit ?? 50)
         .Select(l => new
         {
             l.Id, l.Timestamp, l.PoleId, l.Author, l.Category, l.Text
