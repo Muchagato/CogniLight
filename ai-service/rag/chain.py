@@ -150,6 +150,8 @@ DATE((SELECT MAX(Timestamp) FROM TelemetryReadings), '-1 day')
 - Use SQLite date/time functions (DATE, TIME, STRFTIME, etc.).
 - LIMIT results to 50 rows max.
 - Only generate SELECT queries.
+- Do NOT query AnomalyFlag or AnomalyDescription columns — anomaly and incident context \
+is provided separately. Focus on telemetry metrics (energy, noise, traffic, temperature, etc.).
 
 Generate 1-5 SQL queries to gather the data needed to answer this question:
 {question}
@@ -237,8 +239,9 @@ def _build_prompt(
 
     if rag_narratives:
         sections.append(
-            "--- MAINTENANCE & INCIDENT LOGS ---\n"
-            "These are free-text reports from technicians, automated diagnostics, and control room operators.\n\n"
+            "--- MAINTENANCE, INCIDENT & ANOMALY LOGS ---\n"
+            "These are free-text reports from technicians, automated diagnostics, control room operators, "
+            "and sensor-detected anomaly alerts.\n\n"
             + "\n\n".join(rag_narratives)
             + "\n--- END LOGS ---"
         )
@@ -257,7 +260,7 @@ async def generate_response_stream(
     engine: Engine,
     *,
     llm_config: LLMConfig | None = None,
-    top_k: int = 5,
+    top_k: int = 10,
 ) -> AsyncGenerator[dict, None]:
     """Stream a hybrid SQL+RAG response as SSE events."""
     logger.info("Stream chat query: %s", query)

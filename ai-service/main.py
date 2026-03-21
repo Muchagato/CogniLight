@@ -30,7 +30,7 @@ from sse_starlette.sse import EventSourceResponse  # noqa: E402
 from anomaly.detector import detect_anomalies, summarize_anomalies, AnomalyReport  # noqa: E402
 from constants import TELEMETRY_COLUMNS  # noqa: E402
 from rag.chain import generate_response_stream, LLMConfig  # noqa: E402
-from rag.narrative import load_persisted_incidents, ingest_new_incidents  # noqa: E402
+from rag.narrative import load_persisted_incidents, ingest_new_incidents, load_persisted_anomalies, anomaly_reports_to_chunks  # noqa: E402
 from rag.retriever import Retriever  # noqa: E402
 
 DB_PATH = os.getenv("DATABASE_PATH", "../backend/CogniLight.Api/cognilight.db")
@@ -114,6 +114,9 @@ def _ingest_anomalies() -> None:
             if new_anomalies:
                 _latest_anomalies = new_anomalies + _latest_anomalies
                 _latest_anomalies = _latest_anomalies[:100]
+                # Index anomalies into RAG
+                chunks = anomaly_reports_to_chunks(new_anomalies)
+                retriever.add_chunks(chunks)
     except Exception:
         logger.exception("Anomaly ingestion failed")
 
@@ -139,12 +142,17 @@ async def _ingest_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Load previously persisted incident logs into FAISS
-    global _last_incident_id
+    # Load previously persisted incident logs and anomalies into FAISS
+    global _last_incident_id, _last_anomaly_id
     persisted_chunks, last_id = load_persisted_incidents(engine)
     if persisted_chunks:
         retriever.add_chunks(persisted_chunks)
         _last_incident_id = last_id
+
+    anomaly_chunks, last_anom_id = load_persisted_anomalies(engine)
+    if anomaly_chunks:
+        retriever.add_chunks(anomaly_chunks)
+        _last_anomaly_id = last_anom_id
 
     task = asyncio.create_task(_ingest_loop())
     yield

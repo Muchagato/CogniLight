@@ -1,4 +1,4 @@
-"""Incident log ingestion — loads free-text maintenance/incident logs into FAISS."""
+"""Incident log & anomaly ingestion — loads narrative context into FAISS."""
 from __future__ import annotations
 
 import logging
@@ -6,9 +6,25 @@ import logging
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
+from anomaly.detector import AnomalyReport
 from rag.retriever import Chunk
 
 logger = logging.getLogger(__name__)
+
+
+def anomaly_reports_to_chunks(reports: list[AnomalyReport]) -> list[Chunk]:
+    """Convert AnomalyReport objects to Chunk objects for RAG indexing."""
+    return [
+        Chunk(
+            text=(
+                f"[ANOMALY-{r.severity.upper()}] {r.anomaly_type} at {r.pole_id} — "
+                f"{r.description}"
+            ),
+            timestamp=r.timestamp,
+            pole_ids=[r.pole_id],
+        )
+        for r in reports
+    ]
 
 
 def load_persisted_incidents(engine: Engine) -> tuple[list[Chunk], int]:
@@ -77,3 +93,37 @@ def ingest_new_incidents(
     if chunks:
         logger.info("Ingested %d new incident logs", len(chunks))
     return chunks, new_last_id
+
+
+def load_persisted_anomalies(engine: Engine) -> tuple[list[Chunk], int]:
+    """Load all anomaly-flagged telemetry readings from SQLite for FAISS indexing.
+
+    Returns (chunks, last_ingested_id).
+    """
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT Id, Timestamp, PoleId, AnomalyDescription "
+                    "FROM TelemetryReadings WHERE AnomalyFlag = 1 ORDER BY Id"
+                )
+            ).fetchall()
+    except Exception:
+        logger.info("TelemetryReadings table not found yet — backend may not have started")
+        return [], 0
+
+    if not rows:
+        return [], 0
+
+    last_id = max(row[0] for row in rows)
+    chunks = [
+        Chunk(
+            text=f"[ANOMALY] {row[2]} — {row[3]}",
+            timestamp=str(row[1]),
+            pole_ids=[row[2]],
+        )
+        for row in rows
+        if row[3]  # skip if AnomalyDescription is NULL
+    ]
+    logger.info("Loaded %d persisted anomaly logs (last id: %d)", len(chunks), last_id)
+    return chunks, last_id
