@@ -10,11 +10,14 @@ from dataclasses import dataclass, field
 import httpx
 from sqlalchemy.engine import Engine
 
+from constants import POLE_ZONE_DESCRIPTIONS
 from .retriever import Retriever
 from .sql_context import build_sql_context
 
 logger = logging.getLogger(__name__)
 
+
+MAX_LLM_TOKENS = 2048
 
 # ---------------------------------------------------------------------------
 # Per-request LLM configuration (BYOK)
@@ -78,22 +81,8 @@ def _build_prompt(query: str, sql_context: str, rag_narratives: list[str] | None
         "midnight is anomalous. Reference the zone type when it helps explain the data."
     )
 
-    sections.append(
-        "--- POLE ZONE REFERENCE ---\n"
-        "POLE-01: Office district — busy 8-18h, dead at night\n"
-        "POLE-02: Retail strip — busy 10-20h, quiet overnight\n"
-        "POLE-03: Park — morning/evening pedestrian & cyclist peaks, empty at night\n"
-        "POLE-04: School zone — sharp peaks at 7:30-8:30 and 15-16h (drop-off/pickup), empty nights\n"
-        "POLE-05: Mall area — busy 10-21h, moderate evening, quiet overnight\n"
-        "POLE-06: Apartment complex — morning/evening rush, low daytime, some overnight\n"
-        "POLE-07: Gym — early morning (6-8h) and after-work (17-21h) peaks\n"
-        "POLE-08: Residential — morning/evening commute peaks, quiet during work hours\n"
-        "POLE-09: Cafe district — morning coffee rush (7-10h), lunch peak (12-14h), quiet at night\n"
-        "POLE-10: Mixed-use area — moderate activity throughout the day\n"
-        "POLE-11: Office tower — high vehicle traffic during commute, busy work hours, dead at night\n"
-        "POLE-12: Hotel — steady activity all day, moderate overnight presence\n"
-        "--- END REFERENCE ---"
-    )
+    zone_lines = "\n".join(f"{pid}: {desc}" for pid, desc in POLE_ZONE_DESCRIPTIONS.items())
+    sections.append(f"--- POLE ZONE REFERENCE ---\n{zone_lines}\n--- END REFERENCE ---")
 
     sections.append(sql_context)
 
@@ -107,50 +96,6 @@ def _build_prompt(query: str, sql_context: str, rag_narratives: list[str] | None
 
     sections.append(f"User question: {query}")
     return "\n\n".join(sections)
-
-
-# ---------------------------------------------------------------------------
-# Non-streaming
-# ---------------------------------------------------------------------------
-
-async def generate_response(
-    query: str,
-    retriever: Retriever,
-    engine: Engine,
-    *,
-    llm_config: LLMConfig | None = None,
-    top_k: int = 5,
-) -> tuple[str, list[str]]:
-    """Generate a hybrid SQL+RAG response. Returns (reply, source_texts)."""
-    logger.info("Chat query: %s", query)
-    cfg = llm_config or LLMConfig()
-
-    sql_result = build_sql_context(engine)
-
-    rag_narratives: list[str] | None = None
-    rag_chunks = []
-    if _needs_rag(query):
-        rag_chunks = retriever.search(query, top_k=top_k)
-        if rag_chunks:
-            rag_narratives = [c.text for c in rag_chunks]
-            logger.info("Retrieved %d incident log chunks via RAG", len(rag_narratives))
-
-    if not cfg.api_key:
-        return "No API key provided. Please configure your LLM API key in the chat settings.", []
-
-    logger.info("Calling %s provider (model=%s)", cfg.provider, cfg.effective_model)
-    prompt = _build_prompt(query, sql_result.text, rag_narratives)
-    source_texts = [c.text for c in rag_chunks]
-    try:
-        if cfg.provider == "anthropic":
-            reply = await _call_anthropic(prompt, cfg)
-        else:
-            reply = await _call_openai(prompt, cfg)
-        logger.info("LLM response length: %d chars", len(reply))
-        return reply, source_texts
-    except Exception as e:
-        logger.exception("LLM call failed")
-        return f"Error calling LLM: {e}", source_texts
 
 
 # ---------------------------------------------------------------------------
@@ -224,49 +169,7 @@ async def generate_response_stream(
 
 
 # ---------------------------------------------------------------------------
-# Provider calls — non-streaming
-# ---------------------------------------------------------------------------
-
-async def _call_anthropic(prompt: str, cfg: LLMConfig) -> str:
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(
-            f"{cfg.effective_base_url}/v1/messages",
-            headers={
-                "x-api-key": cfg.api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": cfg.effective_model,
-                "max_tokens": 500,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.3,
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data["content"][0]["text"]
-
-
-async def _call_openai(prompt: str, cfg: LLMConfig) -> str:
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(
-            f"{cfg.effective_base_url}/chat/completions",
-            headers={"Authorization": f"Bearer {cfg.api_key}"},
-            json={
-                "model": cfg.effective_model,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 500,
-                "temperature": 0.3,
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data["choices"][0]["message"]["content"]
-
-
-# ---------------------------------------------------------------------------
-# Provider calls — streaming
+# Provider calls
 # ---------------------------------------------------------------------------
 
 async def _stream_anthropic(prompt: str, cfg: LLMConfig) -> AsyncGenerator[str, None]:
@@ -282,7 +185,7 @@ async def _stream_anthropic(prompt: str, cfg: LLMConfig) -> AsyncGenerator[str, 
             },
             json={
                 "model": cfg.effective_model,
-                "max_tokens": 500,
+                "max_tokens": MAX_LLM_TOKENS,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.3,
                 "stream": True,
@@ -317,7 +220,7 @@ async def _stream_openai(prompt: str, cfg: LLMConfig) -> AsyncGenerator[str, Non
             json={
                 "model": cfg.effective_model,
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 500,
+                "max_tokens": MAX_LLM_TOKENS,
                 "temperature": 0.3,
                 "stream": True,
             },

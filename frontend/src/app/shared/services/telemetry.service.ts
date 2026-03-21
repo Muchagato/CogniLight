@@ -1,5 +1,5 @@
-import { inject, Injectable, NgZone, OnDestroy } from '@angular/core';
-import { Subject, BehaviorSubject } from 'rxjs';
+import { inject, Injectable, NgZone } from '@angular/core';
+import { BehaviorSubject } from 'rxjs';
 import * as signalR from '@microsoft/signalr';
 import { TelemetryReading, TelemetryUpdate } from '../models/telemetry.model';
 
@@ -80,7 +80,7 @@ export const TIME_RANGES: TimeRangeConfig[] = [
 const MAX_HISTORY = 120;
 
 @Injectable({ providedIn: 'root' })
-export class TelemetryService implements OnDestroy {
+export class TelemetryService {
   private readonly zone = inject(NgZone);
   private hubConnection: signalR.HubConnection;
 
@@ -101,7 +101,6 @@ export class TelemetryService implements OnDestroy {
   private readonly selectedPoleSubject = new BehaviorSubject<string | null>(null);
   readonly selectedPoleId$ = this.selectedPoleSubject.asObservable();
 
-  private readonly destroy$ = new Subject<void>();
   private history: AggregateSnapshot[] = [];
   private anomalyLog: AnomalyEvent[] = [];
   private incidentLog: IncidentLog[] = [];
@@ -122,7 +121,7 @@ export class TelemetryService implements OnDestroy {
 
     this.hubConnection.on('IncidentLog', (log: IncidentLog) => {
       this.zone.run(() => {
-        this.incidentLog = [log, ...this.incidentLog].slice(0, 50);
+        this.incidentLog = [log, ...this.incidentLog];
         this.incidentLogsSubject.next(this.incidentLog);
       });
     });
@@ -158,7 +157,7 @@ export class TelemetryService implements OnDestroy {
       if (reading.anomalyFlag && reading.anomalyDescription) {
         this.anomalyLog = [
           { time: data.simulationTime, poleId: reading.poleId, description: reading.anomalyDescription },
-          ...this.anomalyLog.slice(0, 49),
+          ...this.anomalyLog,
         ];
       }
     }
@@ -181,39 +180,33 @@ export class TelemetryService implements OnDestroy {
 
   private readonly apiBase = '/api';
 
+  private async fetchJson<T>(url: string, opts?: RequestInit): Promise<T> {
+    const resp = await fetch(url, opts);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+    return resp.json();
+  }
+
   async getHistory(from: string, to: string, bucketSeconds: number, signal?: AbortSignal): Promise<HistoryBucket[]> {
     const params = new URLSearchParams({ from, to, bucketSeconds: String(bucketSeconds) });
-    const resp = await fetch(`${this.apiBase}/telemetry/history?${params}`, { signal });
-    return resp.json();
+    return this.fetchJson(`${this.apiBase}/telemetry/history?${params}`, { signal });
   }
 
   async getPoleHistory(poleId: string, from: string, to: string, bucketSeconds: number, signal?: AbortSignal): Promise<PoleBucket[]> {
     const params = new URLSearchParams({ from, to, bucketSeconds: String(bucketSeconds) });
-    const resp = await fetch(`${this.apiBase}/telemetry/history/${poleId}?${params}`, { signal });
-    return resp.json();
+    return this.fetchJson(`${this.apiBase}/telemetry/history/${poleId}?${params}`, { signal });
   }
 
-  async getAnomaliesInRange(from: string, to: string, limit = 200, signal?: AbortSignal): Promise<AnomalyEvent[]> {
-    const params = new URLSearchParams({ from, to, limit: String(limit) });
-    const resp = await fetch(`${this.apiBase}/telemetry/anomalies/range?${params}`, { signal });
-    return resp.json();
+  async getAnomaliesInRange(from: string, to: string, signal?: AbortSignal): Promise<AnomalyEvent[]> {
+    const params = new URLSearchParams({ from, to });
+    return this.fetchJson(`${this.apiBase}/telemetry/anomalies/range?${params}`, { signal });
   }
 
-  async getIncidentLogs(limit = 20, signal?: AbortSignal): Promise<IncidentLog[]> {
-    const params = new URLSearchParams({ limit: String(limit) });
-    const resp = await fetch(`${this.apiBase}/incidents?${params}`, { signal });
-    return resp.json();
+  async getIncidentLogs(signal?: AbortSignal): Promise<IncidentLog[]> {
+    return this.fetchJson(`${this.apiBase}/incidents`, { signal });
   }
 
-  async getIncidentLogsInRange(from: string, to: string, limit = 50, signal?: AbortSignal): Promise<IncidentLog[]> {
-    const params = new URLSearchParams({ from, to, limit: String(limit) });
-    const resp = await fetch(`${this.apiBase}/incidents?${params}`, { signal });
-    return resp.json();
-  }
-
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
-    this.hubConnection.stop();
+  async getIncidentLogsInRange(from: string, to: string, signal?: AbortSignal): Promise<IncidentLog[]> {
+    const params = new URLSearchParams({ from, to });
+    return this.fetchJson(`${this.apiBase}/incidents?${params}`, { signal });
   }
 }

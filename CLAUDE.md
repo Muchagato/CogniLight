@@ -5,6 +5,12 @@ Full-stack smart city lighting simulation: Angular 21 frontend, .NET 10 backend,
 ## Commands
 
 ```bash
+# Setup (install all dependencies)
+npm run setup    # root + frontend npm packages, Python venv + pip install
+
+# Dev (all services concurrently)
+npm run dev      # backend :5000, frontend :4200, ai-service :8000
+
 # Backend (.NET 10)
 cd backend/CogniLight.Api && dotnet run --launch-profile http    # :5000
 

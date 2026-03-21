@@ -1,12 +1,17 @@
-using System.Threading.RateLimiting;
+using System.Text.Json;
 using CogniLight.Api;
 using CogniLight.Api.Data;
 using CogniLight.Api.Hubs;
 using CogniLight.Api.Services;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// JSON: camelCase for JavaScript interop
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+});
 
 // Request size limit (10 MB)
 builder.WebHost.ConfigureKestrel(options =>
@@ -50,17 +55,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Rate limiting
-builder.Services.AddRateLimiter(options =>
-{
-    options.RejectionStatusCode = 429;
-    options.AddFixedWindowLimiter("fixed", limiter =>
-    {
-        limiter.PermitLimit = 60;
-        limiter.Window = TimeSpan.FromMinutes(1);
-    });
-});
-
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
@@ -70,6 +64,9 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+
+    // Enable WAL mode for concurrent read/write (AI service reads while backend writes)
+    db.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
 
     // EnsureCreated won't add new tables to an existing DB — create manually if missing
     db.Database.ExecuteSqlRaw("""
@@ -95,7 +92,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
-app.UseRateLimiter();
 
 // Production: generic error responses, no stack traces
 if (!app.Environment.IsDevelopment())
@@ -112,7 +108,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 // REST endpoints
-var api = app.MapGroup("/api").RequireRateLimiting("fixed");
+var api = app.MapGroup("/api");
 
 api.MapGet("/telemetry/latest", async (TelemetryService svc) =>
     await svc.GetLatestReadingsAsync());
@@ -137,11 +133,11 @@ api.MapGet("/telemetry/history/{poleId}", async (string poleId, string from, str
     return await svc.GetPoleHistoryAsync(poleId, fromDt, toDt, bucketSeconds);
 });
 
-api.MapGet("/telemetry/anomalies/range", async (string from, string to, int? limit, TelemetryService svc) =>
+api.MapGet("/telemetry/anomalies/range", async (string from, string to, TelemetryService svc) =>
 {
     var fromDt = DateTime.Parse(from, null, System.Globalization.DateTimeStyles.RoundtripKind);
     var toDt = DateTime.Parse(to, null, System.Globalization.DateTimeStyles.RoundtripKind);
-    var anomalies = await svc.GetAnomaliesInRangeAsync(fromDt, toDt, limit ?? 200);
+    var anomalies = await svc.GetAnomaliesInRangeAsync(fromDt, toDt);
     return anomalies.Select(a => new
     {
         time = a.Timestamp.ToString("o"),
@@ -150,7 +146,7 @@ api.MapGet("/telemetry/anomalies/range", async (string from, string to, int? lim
     });
 });
 
-api.MapGet("/incidents", async (int? limit, string? from, string? to, AppDbContext db) =>
+api.MapGet("/incidents", async (string? from, string? to, AppDbContext db) =>
 {
     var query = db.IncidentLogs.AsQueryable();
 
@@ -163,7 +159,6 @@ api.MapGet("/incidents", async (int? limit, string? from, string? to, AppDbConte
 
     return await query
         .OrderByDescending(l => l.Timestamp)
-        .Take(limit ?? 50)
         .Select(l => new
         {
             l.Id, l.Timestamp, l.PoleId, l.Author, l.Category, l.Text

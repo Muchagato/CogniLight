@@ -24,18 +24,18 @@ from pydantic import BaseModel, Field  # noqa: E402
 from slowapi import Limiter  # noqa: E402
 from slowapi.util import get_remote_address  # noqa: E402
 from slowapi.errors import RateLimitExceeded  # noqa: E402
-from sqlalchemy import create_engine, text  # noqa: E402
+from sqlalchemy import create_engine, event, text  # noqa: E402
 from sse_starlette.sse import EventSourceResponse  # noqa: E402
 
 from anomaly.detector import detect_anomalies, summarize_anomalies, AnomalyReport  # noqa: E402
 from constants import TELEMETRY_COLUMNS  # noqa: E402
-from rag.chain import generate_response, generate_response_stream, LLMConfig  # noqa: E402
+from rag.chain import generate_response_stream, LLMConfig  # noqa: E402
 from rag.narrative import load_persisted_incidents, ingest_new_incidents  # noqa: E402
 from rag.retriever import Retriever  # noqa: E402
 
 DB_PATH = os.getenv("DATABASE_PATH", "../backend/CogniLight.Api/cognilight.db")
 INGEST_INTERVAL = int(os.getenv("INGEST_INTERVAL", "10"))  # seconds
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "").split(",") if os.getenv("CORS_ORIGINS") else ["*"]
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "").split(",") if os.getenv("CORS_ORIGINS") else ["http://localhost:4200"]
 
 logger.info("AI Service starting in BYOK mode (no server-side API key)")
 
@@ -46,7 +46,16 @@ _last_anomaly_id: int = 0
 
 
 def _get_engine():
-    return create_engine(f"sqlite:///{DB_PATH}", echo=False)
+    eng = create_engine(f"sqlite:///{DB_PATH}", echo=False)
+
+    # Enable WAL mode for concurrent reads while backend writes
+    @event.listens_for(eng, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL;")
+        cursor.close()
+
+    return eng
 
 
 engine = _get_engine()
@@ -181,19 +190,6 @@ async def chat_status() -> dict[str, Any]:
 
 class ChatRequest(BaseModel):
     message: str = Field(..., max_length=2000)
-
-
-class ChatResponse(BaseModel):
-    reply: str
-    sources: list[str] = []
-
-
-@app.post("/api/chat", response_model=ChatResponse)
-@limiter.limit("10/minute")
-async def chat(request_body: ChatRequest, request: Request) -> ChatResponse:
-    cfg = _extract_llm_config(request)
-    reply, sources = await generate_response(request_body.message, retriever, engine, llm_config=cfg)
-    return ChatResponse(reply=reply, sources=sources)
 
 
 @app.post("/api/chat/stream")

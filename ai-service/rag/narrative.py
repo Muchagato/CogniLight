@@ -11,12 +11,6 @@ from rag.retriever import Chunk
 logger = logging.getLogger(__name__)
 
 
-def _ensure_table(engine: Engine) -> None:
-    """Verify the IncidentLogs table exists (created by .NET backend)."""
-    # Table is created by EF Core on the .NET side — we just read from it.
-    pass
-
-
 def load_persisted_incidents(engine: Engine) -> tuple[list[Chunk], int]:
     """Load all incident logs from SQLite for FAISS indexing.
 

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using CogniLight.Api.Data;
 using CogniLight.Api.Hubs;
 using CogniLight.Api.Models;
@@ -17,8 +18,8 @@ public class IncidentLogGenerator : IHostedService, IDisposable
     private Timer? _timer;
     private readonly Random _rng = new(123);
 
-    // Track recent anomalies to generate follow-up logs
-    private readonly Queue<(DateTime Timestamp, string PoleId, string AnomalyDesc)> _pendingAnomalies = new();
+    // Track recent anomalies to generate follow-up logs (accessed from multiple timer threads)
+    private readonly ConcurrentQueue<(DateTime Timestamp, string PoleId, string AnomalyDesc)> _pendingAnomalies = new();
     private DateTime _lastScheduledLog = DateTime.MinValue;
 
     private static readonly string[] TechnicianNames =
@@ -32,21 +33,8 @@ public class IncidentLogGenerator : IHostedService, IDisposable
         "AutoDiag System", "Predictive Maintenance AI", "Control Room Operator"
     ];
 
-    private static readonly Dictionary<string, string> PoleZoneNames = new()
-    {
-        ["POLE-01"] = "office district",
-        ["POLE-02"] = "retail strip",
-        ["POLE-03"] = "park area",
-        ["POLE-04"] = "school zone",
-        ["POLE-05"] = "mall area",
-        ["POLE-06"] = "apartment complex",
-        ["POLE-07"] = "gym area",
-        ["POLE-08"] = "residential area",
-        ["POLE-09"] = "cafe district",
-        ["POLE-10"] = "mixed-use area",
-        ["POLE-11"] = "office tower area",
-        ["POLE-12"] = "hotel area",
-    };
+    // Zone names sourced from SimulationEngine (single source of truth)
+    private static string ZoneName(string poleId) => SimulationEngine.GetZoneName(poleId);
 
     public IncidentLogGenerator(
         IServiceScopeFactory scopeFactory,
@@ -93,10 +81,10 @@ public class IncidentLogGenerator : IHostedService, IDisposable
             var now = DateTime.UtcNow;
 
             // Process pending anomaly follow-ups (with 1-5 min simulated delay)
-            while (_pendingAnomalies.Count > 0 && _pendingAnomalies.Peek().Timestamp.AddMinutes(1) <= now)
+            while (_pendingAnomalies.TryPeek(out var next) && next.Timestamp.AddMinutes(1) <= now)
             {
-                var (ts, poleId, desc) = _pendingAnomalies.Dequeue();
-                var log = GenerateAnomalyFollowUp(now, poleId, desc);
+                if (!_pendingAnomalies.TryDequeue(out var item)) break;
+                var log = GenerateAnomalyFollowUp(now, item.PoleId, item.AnomalyDesc);
                 if (log != null)
                     logs.Add(log);
             }
@@ -142,7 +130,7 @@ public class IncidentLogGenerator : IHostedService, IDisposable
 
     private IncidentLog? GenerateAnomalyFollowUp(DateTime now, string poleId, string anomalyDesc)
     {
-        var zone = PoleZoneNames.GetValueOrDefault(poleId, "area");
+        var zone = ZoneName(poleId);
         var tech = TechnicianNames[_rng.Next(TechnicianNames.Length)];
 
         if (anomalyDesc.Contains("energy spike", StringComparison.OrdinalIgnoreCase))
@@ -227,7 +215,7 @@ public class IncidentLogGenerator : IHostedService, IDisposable
     {
         var poleIndex = _rng.Next(12);
         var poleId = $"POLE-{poleIndex + 1:D2}";
-        var zone = PoleZoneNames.GetValueOrDefault(poleId, "area");
+        var zone = ZoneName(poleId);
         var tech = TechnicianNames[_rng.Next(TechnicianNames.Length)];
 
         var type = _rng.Next(4);
