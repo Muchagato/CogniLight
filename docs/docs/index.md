@@ -53,6 +53,13 @@ This documentation serves as both a technical reference and an educational walkt
 
     Services start at: frontend (`:4200`), backend (`:5000`), ai-service (`:8000`).
 
+=== "npm scripts"
+
+    ```bash
+    npm run setup   # install all dependencies (npm + Python venv)
+    npm run dev     # start backend, frontend, and AI service concurrently
+    ```
+
 === "Manual (each service)"
 
     ```bash

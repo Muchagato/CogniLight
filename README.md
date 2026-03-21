@@ -36,8 +36,8 @@ The simulation starts automatically. To use the AI chat, configure an LLM API ke
 To run all services at once without Docker (.NET 10, Node 22+, Python 3.11+ required):
 
 ```bash
-npm install
-npm run dev
+npm run setup   # install all dependencies (npm + Python venv)
+npm run dev     # start backend, frontend, and AI service concurrently
 ```
 
 Or run each service individually:
