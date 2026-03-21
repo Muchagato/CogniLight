@@ -8,38 +8,37 @@ The RAG pipeline is the core intelligence of CogniLight's AI chat. It combines t
 
 ```mermaid
 graph LR
-    Q[User Query] --> CLASSIFY{_sql_only?}
-    Q --> SQL[SQL Context Builder]
+    Q[User Query] --> GEN[LLM: Generate SQL]
+    GEN --> DB[(SQLite)]
+    DB --> EXEC[Execute Queries]
+    EXEC -->|Errors?| RETRY[LLM: Fix & Retry]
+    RETRY --> DB
 
-    SQL --> DB[(SQLite)]
-    DB --> SNAPSHOT[Latest per pole]
-    DB --> ANOMALIES[Recent anomalies]
-    DB --> RANGE[Time range]
-
-    CLASSIFY -->|No| RAG[FAISS Search]
+    Q --> CLASSIFY{_needs_rag?}
+    CLASSIFY -->|Yes| RAG[FAISS Search]
     RAG --> EMBED[Embed query]
     EMBED --> SEARCH[Top-5 chunks]
 
-    SQL --> PROMPT[Prompt Builder]
+    EXEC --> PROMPT[Prompt Builder]
     SEARCH --> PROMPT
-    PROMPT --> LLM[LLM API]
-    LLM --> STREAM[SSE Token Stream]
+    PROMPT --> LLM2[LLM: Stream Answer]
+    LLM2 --> STREAM[SSE Token Stream]
 ```
 
 ---
 
 ## Step 1: Query Classification
 
-RAG context is **included by default**. The `_sql_only()` function identifies the small set of trivial factual queries where incident logs add no value:
+RAG context is **included by default**. The `_needs_rag()` function identifies whether the query benefits from incident log context:
 
 ```python
 _SQL_ONLY_KEYWORDS = re.compile(
-    r"(?:what time|current time|how many poles|number of poles|list (?:all )?poles)",
+    r"^(?:what time|current time|how many poles|list poles|pole count)\b",
     re.I,
 )
 
-def _sql_only(query: str) -> bool:
-    return bool(_SQL_ONLY_KEYWORDS.search(query))
+def _needs_rag(query: str) -> bool:
+    return not bool(_SQL_ONLY_KEYWORDS.search(query))
 ```
 
 This opt-out approach is simpler and more robust than trying to enumerate all keywords that *should* trigger RAG. Most user questions benefit from narrative incident context, so it makes sense to include it unless we're confident it's unnecessary.
@@ -56,66 +55,66 @@ This opt-out approach is simpler and more robust than trying to enumerate all ke
 
 ---
 
-## Step 2: SQL Context (Always)
+## Step 2: Text-to-SQL (Always)
 
-`build_sql_context()` in `rag/sql_context.py` runs three queries against SQLite:
+Instead of hardcoded queries, `chain.py` uses a text-to-SQL approach: the LLM generates targeted SQL queries based on the user's question.
 
-### Query 1: Latest Reading Per Pole
+### SQL Generation
 
-```sql
-SELECT * FROM TelemetryReadings
-WHERE Id IN (SELECT MAX(Id) FROM TelemetryReadings GROUP BY PoleId)
-ORDER BY PoleId
+The LLM receives a prompt containing the database schema (from `get_table_schema()`), column descriptions, pole zone mappings, and the user's question. It returns a JSON array of 1-5 query objects:
+
+```json
+[
+  {"label": "Current readings per pole", "sql": "SELECT * FROM TelemetryReadings WHERE ..."},
+  {"label": "Energy trends last hour", "sql": "SELECT PoleId, AVG(EnergyWatts) ..."}
+]
 ```
 
-Provides the current state of every pole: energy, traffic, environmental readings, anomaly status.
+This is a non-streaming LLM call (`_call_llm()`) with `temperature=0.0` for deterministic output.
 
-### Query 2: Recent Anomalies
+### Execution & Safety
+
+`execute_queries()` in `rag/sql_context.py` runs each query against SQLite:
+
+- **Only SELECT queries are allowed** — any non-SELECT statement is rejected with an error
+- **Max 200 rows** per query result (`MAX_QUERY_ROWS`)
+- Errors are captured per-query (the pipeline continues with partial results)
+
+### Retry on Failure
+
+If any queries fail, `chain.py` sends the errors back to the LLM via `_fix_failed_queries()`, which asks it to fix the SQL based on the error messages. The fixed queries are executed and merged with the successful results.
+
+### Fallback
+
+If the LLM generates no queries (empty response or parse failure), a simple fallback is used:
 
 ```sql
-SELECT PoleId, Timestamp, AnomalyDescription
-FROM TelemetryReadings
-WHERE AnomalyFlag = 1 ORDER BY Id DESC LIMIT 20
+SELECT * FROM TelemetryReadings ORDER BY Id DESC LIMIT 50
 ```
-
-The last 20 anomalies across all poles.
-
-### Query 3: Simulation Time Range
-
-```sql
-SELECT MIN(Timestamp), MAX(Timestamp) FROM TelemetryReadings
-```
-
-Tells the LLM how much history is available.
 
 ### Formatted Output
 
-The SQL results are formatted into a structured text block for the LLM prompt:
+`format_query_results()` converts the results into a text block for the final LLM prompt:
 
 ```
---- CURRENT NETWORK STATE (simulation time: 2026-03-20 14:23:01) ---
-Network totals: 1523W energy, 15 pedestrians, 8 vehicles, 3 cyclists
-Avg AQI: 48 | Avg Temp: 24.2C | Active anomalies: 1
+--- QUERY RESULTS ---
 
-Per-pole current readings:
-| Pole | Zone | Energy | Ped | Veh | Cyc | AQI | Temp | Noise | Light% | Anomaly |
-|------|------|--------|-----|-----|-----|-----|------|-------|--------|---------|
-| POLE-01 | Office | 142W | 3 | 2 | 1 | 46 | 24.7C | 48dB | 13% | - |
+### Current readings per pole
+SQL: SELECT * FROM TelemetryReadings WHERE Id IN (...)
+(12 rows)
+| Id | PoleId | Timestamp | EnergyWatts | ... |
+|---|---|---|---|---|
+| 1234 | POLE-01 | 2026-03-20 14:23:01 | 142 | ... |
 ...
 
-Top energy consumers: POLE-11 (Tower, 198W), POLE-05 (Mall, 187W), ...
-Top traffic poles: POLE-05 (Mall, 7 total), POLE-02 (Retail, 5 total), ...
-
-Recent anomalies:
-- 14:21:45 POLE-04 (School): Unusual pedestrian cluster during off-hours
---- END CURRENT STATE ---
+--- END QUERY RESULTS ---
 ```
 
 ---
 
 ## Step 3: RAG Retrieval (Default-On)
 
-Unless `_sql_only()` returns True, the retriever performs a semantic search:
+Unless `_needs_rag()` returns False, the retriever performs a semantic search:
 
 ### Embedding
 
@@ -157,7 +156,7 @@ The prompt is assembled from sections:
 
 1. **System instruction** — persona ("You are CogniLight AI"), formatting guidelines, zone awareness
 2. **Pole zone reference** — hardcoded descriptions of each pole's expected activity patterns
-3. **SQL context** — the formatted network state from Step 2
+3. **Query results** — the formatted SQL output from Step 2
 4. **RAG context** (if applicable) — incident log excerpts
 5. **User question** — the actual query
 
@@ -175,7 +174,7 @@ This enables the LLM to reason about *why* a reading is normal or anomalous. For
 
 ## Step 5: LLM Streaming
 
-The service supports two LLM providers with streaming:
+The service makes two types of LLM calls: a non-streaming call for SQL generation (Step 2) and a streaming call for the final answer. Both support two providers:
 
 ### Anthropic (Claude)
 

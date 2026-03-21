@@ -5,14 +5,14 @@ import json
 import logging
 import re
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import httpx
 from sqlalchemy.engine import Engine
 
-from constants import POLE_ZONE_DESCRIPTIONS
+from constants import POLE_ZONE_DESCRIPTIONS, POLE_ZONES
 from .retriever import Retriever
-from .sql_context import build_sql_context
+from .sql_context import get_table_schema, execute_queries, format_query_results
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +65,159 @@ def _needs_rag(query: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Non-streaming LLM calls (for SQL generation)
+# ---------------------------------------------------------------------------
+
+async def _call_llm(prompt: str, cfg: LLMConfig) -> str:
+    """Make a non-streaming LLM call and return the full response text."""
+    if cfg.provider == "anthropic":
+        return await _call_anthropic(prompt, cfg)
+    return await _call_openai(prompt, cfg)
+
+
+async def _call_anthropic(prompt: str, cfg: LLMConfig) -> str:
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            f"{cfg.effective_base_url}/v1/messages",
+            headers={
+                "x-api-key": cfg.api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": cfg.effective_model,
+                "max_tokens": 1024,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.0,
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data["content"][0]["text"]
+
+
+async def _call_openai(prompt: str, cfg: LLMConfig) -> str:
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            f"{cfg.effective_base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {cfg.api_key}"},
+            json={
+                "model": cfg.effective_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 1024,
+                "temperature": 0.0,
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data["choices"][0]["message"]["content"]
+
+
+# ---------------------------------------------------------------------------
+# SQL query generation
+# ---------------------------------------------------------------------------
+
+_ZONE_LIST = "\n".join(f"  {pid}: {zone}" for pid, zone in POLE_ZONES.items())
+
+_QUERY_GEN_PROMPT = """\
+You are a SQL query generator for a smart street lighting telemetry database (SQLite).
+
+Schema:
+{schema}
+
+Column notes:
+- PoleId: "POLE-01" through "POLE-12"
+- Timestamp: datetime string "YYYY-MM-DD HH:MM:SS.fffffff" (7 fractional digits)
+- EnergyWatts: power consumption in watts
+- PedestrianCount, VehicleCount, CyclistCount: detected traffic counts
+- AmbientLightLux: ambient light sensor reading
+- TemperatureC: temperature in Celsius
+- HumidityPct: humidity percentage
+- AirQualityAqi: air quality index (higher = worse)
+- NoiseDb: noise level in decibels
+- LightLevelPct: light dimming level (0-100%)
+- AnomalyFlag: 0 or 1
+- AnomalyDescription: text when AnomalyFlag=1, NULL otherwise
+
+Pole zones:
+{zones}
+
+Important:
+- The simulation has its own clock. Use the data to determine time references.
+- For relative time references like "yesterday", first determine the latest timestamp \
+in the data, then compute from there. For example: \
+DATE((SELECT MAX(Timestamp) FROM TelemetryReadings), '-1 day')
+- Use SQLite date/time functions (DATE, TIME, STRFTIME, etc.).
+- LIMIT results to 50 rows max.
+- Only generate SELECT queries.
+
+Generate 1-5 SQL queries to gather the data needed to answer this question:
+{question}
+
+Return ONLY a JSON array of objects, each with "label" (short description) and "sql" (the query).
+No markdown fences, no explanation — just the JSON array."""
+
+
+def _parse_query_json(raw: str) -> list[dict[str, str]]:
+    """Extract a JSON array of query objects from LLM output."""
+    # Strip markdown fences if present
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```\w*\n?", "", cleaned)
+        cleaned = re.sub(r"\n?```$", "", cleaned)
+        cleaned = cleaned.strip()
+
+    queries = json.loads(cleaned)
+    if not isinstance(queries, list):
+        return []
+    return [q for q in queries if isinstance(q, dict) and "sql" in q]
+
+
+_RETRY_PROMPT = """\
+The following SQL queries failed against a SQLite database. Fix them based on the errors.
+
+Schema:
+{schema}
+
+Failed queries:
+{failures}
+
+Return ONLY a JSON array of objects with "label" and "sql" keys. No explanation."""
+
+
+async def _generate_sql_queries(
+    question: str, schema: str, cfg: LLMConfig,
+) -> list[dict[str, str]]:
+    """Ask the LLM to generate SQL queries for the user's question."""
+    prompt = _QUERY_GEN_PROMPT.format(
+        schema=schema, zones=_ZONE_LIST, question=question,
+    )
+    raw = await _call_llm(prompt, cfg)
+    return _parse_query_json(raw)
+
+
+async def _fix_failed_queries(
+    failed: list[dict[str, str]], schema: str, cfg: LLMConfig,
+) -> list[dict[str, str]]:
+    """Ask the LLM to fix queries that returned errors."""
+    failures_text = "\n".join(
+        f"- Label: {f['label']}\n  SQL: {f['sql']}\n  Error: {f['error']}"
+        for f in failed
+    )
+    prompt = _RETRY_PROMPT.format(schema=schema, failures=failures_text)
+    raw = await _call_llm(prompt, cfg)
+    return _parse_query_json(raw)
+
+
+# ---------------------------------------------------------------------------
 # Prompt builder
 # ---------------------------------------------------------------------------
 
-def _build_prompt(query: str, sql_context: str, rag_narratives: list[str] | None) -> str:
+def _build_prompt(
+    query: str,
+    query_results_text: str,
+    rag_narratives: list[str] | None,
+) -> str:
     sections: list[str] = []
     sections.append(
         "You are CogniLight AI, an assistant analyzing smart street lighting telemetry data.\n"
@@ -84,7 +233,7 @@ def _build_prompt(query: str, sql_context: str, rag_narratives: list[str] | None
     zone_lines = "\n".join(f"{pid}: {desc}" for pid, desc in POLE_ZONE_DESCRIPTIONS.items())
     sections.append(f"--- POLE ZONE REFERENCE ---\n{zone_lines}\n--- END REFERENCE ---")
 
-    sections.append(sql_context)
+    sections.append(query_results_text)
 
     if rag_narratives:
         sections.append(
@@ -114,16 +263,50 @@ async def generate_response_stream(
     logger.info("Stream chat query: %s", query)
     cfg = llm_config or LLMConfig()
 
-    sql_result = build_sql_context(engine)
+    if not cfg.api_key:
+        yield {"event": "token", "data": {"text": "No API key provided. Please configure your LLM API key in the chat settings."}}
+        yield {"event": "done", "data": {}}
+        return
 
-    rag_narratives: list[str] | None = None
-    rag_chunks = []
-    if _needs_rag(query):
-        rag_chunks = retriever.search(query, top_k=top_k)
-        if rag_chunks:
-            rag_narratives = [c.text for c in rag_chunks]
-            logger.info("Retrieved %d incident log chunks via RAG", len(rag_narratives))
+    # --- Step 1: Generate SQL queries via LLM ---
+    schema = get_table_schema(engine)
+    if not schema:
+        yield {"event": "token", "data": {"text": "Database schema not available."}}
+        yield {"event": "done", "data": {}}
+        return
 
+    try:
+        generated = await _generate_sql_queries(query, schema, cfg)
+    except Exception as e:
+        logger.exception("SQL generation failed")
+        yield {"event": "token", "data": {"text": f"Failed to generate queries: {e}"}}
+        yield {"event": "done", "data": {}}
+        return
+
+    if not generated:
+        generated = [{"label": "All data (fallback)", "sql": "SELECT * FROM TelemetryReadings ORDER BY Id DESC LIMIT 50"}]
+
+    # --- Step 2: Execute queries ---
+    query_results = execute_queries(engine, generated)
+
+    # --- Step 3: Retry failed queries ---
+    failed = [
+        {"label": qr.label, "sql": qr.query, "error": qr.error}
+        for qr in query_results if qr.error
+    ]
+    if failed:
+        try:
+            fixed = await _fix_failed_queries(failed, schema, cfg)
+            if fixed:
+                fixed_results = execute_queries(engine, fixed)
+                # Replace failed entries with retried results
+                successful = [qr for qr in query_results if not qr.error]
+                query_results = successful + fixed_results
+        except Exception:
+            logger.exception("Query retry failed")
+            # Keep original results (with errors) — LLM will note them
+
+    # --- Step 4: Send query metadata to frontend ---
     yield {
         "event": "sql_context",
         "data": {
@@ -135,10 +318,19 @@ async def generate_response_stream(
                     "columns": q.columns,
                     "rows": q.rows,
                 }
-                for q in sql_result.queries
+                for q in query_results
             ],
         },
     }
+
+    # --- Step 5: RAG retrieval ---
+    rag_narratives: list[str] | None = None
+    rag_chunks = []
+    if _needs_rag(query):
+        rag_chunks = retriever.search(query, top_k=top_k)
+        if rag_chunks:
+            rag_narratives = [c.text for c in rag_chunks]
+            logger.info("Retrieved %d incident log chunks via RAG", len(rag_narratives))
 
     if rag_chunks:
         structured_sources = [
@@ -147,13 +339,10 @@ async def generate_response_stream(
         ]
         yield {"event": "sources", "data": {"sources": structured_sources}}
 
-    if not cfg.api_key:
-        yield {"event": "token", "data": {"text": "No API key provided. Please configure your LLM API key in the chat settings."}}
-        yield {"event": "done", "data": {}}
-        return
-
+    # --- Step 6: Build prompt and stream answer ---
     logger.info("Streaming from %s (model=%s)", cfg.provider, cfg.effective_model)
-    prompt = _build_prompt(query, sql_result.text, rag_narratives)
+    query_results_text = format_query_results(query_results)
+    prompt = _build_prompt(query, query_results_text, rag_narratives)
     try:
         if cfg.provider == "anthropic":
             stream_fn = _stream_anthropic
@@ -169,7 +358,7 @@ async def generate_response_stream(
 
 
 # ---------------------------------------------------------------------------
-# Provider calls
+# Provider streaming calls
 # ---------------------------------------------------------------------------
 
 async def _stream_anthropic(prompt: str, cfg: LLMConfig) -> AsyncGenerator[str, None]:

@@ -21,8 +21,8 @@ ai-service/
 ├── main.py                      # FastAPI app, endpoints, background tasks
 ├── constants.py                 # Shared POLE_ZONES, TELEMETRY_COLUMNS
 ├── rag/
-│   ├── chain.py                 # Query classifier, prompt builder, LLM streaming
-│   ├── sql_context.py           # Direct SQL queries for current state
+│   ├── chain.py                 # Text-to-SQL generation, prompt builder, LLM streaming
+│   ├── sql_context.py           # Schema introspection, query execution, result formatting
 │   ├── retriever.py             # FAISS vector search
 │   ├── narrative.py             # Incident log ingestion into FAISS
 │   └── embeddings.py            # Sentence-transformer or demo embeddings

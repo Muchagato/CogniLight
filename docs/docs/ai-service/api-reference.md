@@ -78,26 +78,26 @@ Streaming chat endpoint. Returns an SSE stream with structured events.
 
 #### `sql_context`
 
-Always emitted first. Contains the SQL queries run and their results.
+Always emitted first. Contains the LLM-generated SQL queries and their results. The queries are dynamic — tailored to the user's question via a text-to-SQL step.
 
 ```json
 {
   "queries": [
     {
-      "label": "Latest reading per pole",
+      "label": "Current readings per pole",
       "query": "SELECT * FROM TelemetryReadings WHERE Id IN (...)",
       "rowCount": 12,
-      "columns": ["Pole", "Zone", "Energy", "Ped", "Veh", "Cyc", "AQI", "Temp", "Noise", "Light%", "Anomaly"],
+      "columns": ["Id", "PoleId", "Timestamp", "EnergyWatts", "..."],
       "rows": [
-        ["POLE-01", "Office", "142W", 3, 2, 1, 46, "24.7", "48", "13%", "-"],
+        ["1234", "POLE-01", "2026-03-20 14:23:01", "142", "..."],
         ...
       ]
     },
     {
-      "label": "Recent anomalies",
-      "query": "SELECT PoleId, Timestamp, AnomalyDescription FROM ...",
-      "rowCount": 5,
-      "columns": ["Pole", "Timestamp", "Description"],
+      "label": "Energy trends last hour",
+      "query": "SELECT PoleId, AVG(EnergyWatts) FROM ...",
+      "rowCount": 12,
+      "columns": ["PoleId", "avg(EnergyWatts)"],
       "rows": [...]
     }
   ]
