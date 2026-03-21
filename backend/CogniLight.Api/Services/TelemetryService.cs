@@ -29,6 +29,9 @@ public class TelemetryService
             await db.TelemetryReadings
                 .Where(r => r.Timestamp < cutoff)
                 .ExecuteDeleteAsync();
+            await db.IncidentLogs
+                .Where(l => l.Timestamp < cutoff)
+                .ExecuteDeleteAsync();
         }
     }
 

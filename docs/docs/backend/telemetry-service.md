@@ -39,10 +39,13 @@ if (Random.Shared.Next(100) == 0)
     await db.TelemetryReadings
         .Where(r => r.Timestamp < cutoff)
         .ExecuteDeleteAsync();
+    await db.IncidentLogs
+        .Where(l => l.Timestamp < cutoff)
+        .ExecuteDeleteAsync();
 }
 ```
 
-This fires roughly every 100 seconds (1% chance per tick). The `ExecuteDeleteAsync()` call translates to a single SQL `DELETE` statement — no entities are loaded into memory.
+This fires roughly every 100 seconds (1% chance per tick). The `ExecuteDeleteAsync()` calls translate to single SQL `DELETE` statements — no entities are loaded into memory. Both telemetry readings and incident logs share the same 3-day retention window.
 
 An additional startup pruning runs in `Program.cs` to catch up after any downtime.
 

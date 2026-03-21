@@ -176,6 +176,6 @@ sequenceDiagram
 
 The system implements a simple retention policy:
 
-- **On startup:** Readings older than 3 days are pruned (`Program.cs` startup block)
-- **During operation:** The `TelemetryService` randomly triggers pruning (1% chance per tick) to avoid per-tick overhead while keeping the DB from growing unbounded
+- **On startup:** Telemetry readings and incident logs older than 3 days are pruned (`Program.cs` startup block)
+- **During operation:** The `TelemetryService` randomly triggers pruning of both tables (1% chance per tick) to avoid per-tick overhead while keeping the DB from growing unbounded
 - **FAISS index:** In-memory only, rebuilt from SQLite on service restart. Not persisted to disk.

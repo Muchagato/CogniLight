@@ -84,6 +84,7 @@ using (var scope = app.Services.CreateScope())
 
     var cutoff = DateTime.UtcNow.AddDays(-3);
     db.TelemetryReadings.Where(r => r.Timestamp < cutoff).ExecuteDelete();
+    db.IncidentLogs.Where(l => l.Timestamp < cutoff).ExecuteDelete();
 }
 
 if (app.Environment.IsDevelopment())

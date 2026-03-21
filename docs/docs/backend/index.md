@@ -61,7 +61,7 @@ SignalR is included in the `Microsoft.NET.Sdk.Web` SDK — no additional package
 4. **Build the app** — Then immediately:
     - `EnsureCreated()` to create the SQLite database and tables
     - Manual `CREATE TABLE IF NOT EXISTS` for `IncidentLogs` (because `EnsureCreated()` won't add tables to an existing DB)
-    - Prune telemetry older than 3 days
+    - Prune telemetry and incident logs older than 3 days
 
 5. **Map endpoints** — REST endpoints under `/api/`, SignalR hub at `/hubs/telemetry`, OpenAPI at `/openapi` (dev only).
 
