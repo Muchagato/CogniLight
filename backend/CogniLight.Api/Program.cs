@@ -1,12 +1,17 @@
-using System.Threading.RateLimiting;
+using System.Text.Json;
 using CogniLight.Api;
 using CogniLight.Api.Data;
 using CogniLight.Api.Hubs;
 using CogniLight.Api.Services;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// JSON: camelCase for JavaScript interop
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+});
 
 // Request size limit (10 MB)
 builder.WebHost.ConfigureKestrel(options =>
@@ -50,17 +55,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Rate limiting
-builder.Services.AddRateLimiter(options =>
-{
-    options.RejectionStatusCode = 429;
-    options.AddFixedWindowLimiter("fixed", limiter =>
-    {
-        limiter.PermitLimit = 60;
-        limiter.Window = TimeSpan.FromMinutes(1);
-    });
-});
-
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
@@ -98,7 +92,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
-app.UseRateLimiter();
 
 // Production: generic error responses, no stack traces
 if (!app.Environment.IsDevelopment())
@@ -115,7 +108,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 // REST endpoints
-var api = app.MapGroup("/api").RequireRateLimiting("fixed");
+var api = app.MapGroup("/api");
 
 api.MapGet("/telemetry/latest", async (TelemetryService svc) =>
     await svc.GetLatestReadingsAsync());

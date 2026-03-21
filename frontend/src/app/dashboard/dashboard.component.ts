@@ -91,6 +91,8 @@ export class DashboardComponent implements OnDestroy {
   // Historical data
   private historicalData: AggregateSnapshot[] = [];
   private historicalPoleData: PoleBucket[] = [];
+  private historicalFrom = '';
+  private historicalTo = '';
   private abortController: AbortController | null = null;
 
   // Rolling window refresh for historical ranges
@@ -418,7 +420,7 @@ export class DashboardComponent implements OnDestroy {
     if (range.duration <= 3600) {
       return `${this.fmtTime(from)} – ${this.fmtTime(to)}`;
     }
-    if (range.duration <= 86400) {
+    if (range.duration < 86400) {
       return `${this.fmtShort(from)} – ${this.fmtShort(to)}`;
     }
     return `${this.fmtDate(from)} – ${this.fmtDate(to)}`;
@@ -583,7 +585,11 @@ export class DashboardComponent implements OnDestroy {
     ] : [];
 
     const timeFmt = this.getTimeAxisFormat();
-    const timeAxis = { type: 'time' as const, boundaryGap: false as const, axisLabel: { ...AXIS_LABEL, formatter: timeFmt }, axisLine: AXIS_LINE };
+    const timeAxis: Record<string, unknown> = { type: 'time' as const, boundaryGap: false as const, axisLabel: { ...AXIS_LABEL, formatter: timeFmt }, axisLine: AXIS_LINE };
+    if (isHistorical && this.historicalFrom && this.historicalTo) {
+      timeAxis['min'] = this.historicalFrom;
+      timeAxis['max'] = this.historicalTo;
+    }
     const tp = this.timePair.bind(this);
 
     this.energyChart?.setOption({
@@ -656,6 +662,8 @@ export class DashboardComponent implements OnDestroy {
     const toIso = now.toISOString();
 
     this.rangeLabel = this.formatRangeLabel(from, now, range);
+    this.historicalFrom = fromIso;
+    this.historicalTo = toIso;
 
     this.abortController?.abort();
     this.abortController = new AbortController();
