@@ -4,6 +4,8 @@ A full-stack simulation of a smart city lighting network with cognitive sensing 
 
 Built with Angular 21, .NET 10, and Python (FastAPI), deployed via Docker Compose with automated CI/CD to a self-hosted NAS.
 
+**[Live Demo](https://cognilight.muchagato.dev)** · **[Documentation](https://cognilight.muchagato.dev/docs)**
+
 ## How It Works
 
 The backend runs a simulation engine that ticks once per second, producing telemetry for every pole: energy consumption, pedestrian/vehicle/cyclist counts, environmental readings, and adaptive dimming output. Each pole's behavior is shaped by its zone type — an office district is busy during work hours and dead at night, while a hotel maintains steady activity around the clock.
@@ -12,24 +14,42 @@ Telemetry is pushed to the frontend in real time via SignalR. The dashboard visu
 
 An AI chat interface lets users query the data in natural language. It uses a hybrid pipeline: direct SQL queries for current network state, plus semantic search (FAISS) over maintenance incident logs for narrative context. Users bring their own LLM API key (Anthropic or OpenAI).
 
-## Running It
+## Quick Start (Local)
+
+**Prerequisites:** Docker and Docker Compose.
 
 ```bash
+git clone https://github.com/muchagato/CogniLight.git
+cd CogniLight
 docker compose up --build
 ```
 
-Open [localhost:4200](http://localhost:4200). The simulation starts immediately.
+| Service | URL |
+|---------|-----|
+| App | [localhost:4200](http://localhost:4200) |
+| Docs | [localhost:4200/docs](http://localhost:4200/docs) |
+| Backend API | [localhost:5000](http://localhost:5000) |
+| AI Service | [localhost:8000](http://localhost:8000) |
+
+The simulation starts automatically. To use the AI chat, configure an LLM API key (Anthropic or OpenAI) in the settings panel.
+
+To run all services at once without Docker (.NET 10, Node 22+, Python 3.11+ required):
+
+```bash
+npm install
+npm run dev
+```
 
 Or run each service individually:
 
 ```bash
-# Backend — starts simulation engine, serves REST + SignalR on :5000
+# Backend
 cd backend/CogniLight.Api && dotnet run --launch-profile http
 
-# Frontend — Angular dev server on :4200
+# Frontend
 cd frontend && npm install && npx ng serve
 
-# AI Service (optional) — FastAPI on :8000
+# AI Service (optional)
 cd ai-service && pip install -r requirements.txt && uvicorn main:app --port 8000
 ```
 
@@ -76,12 +96,4 @@ All three services share a single SQLite database. The backend is the sole write
 
 ## Documentation
 
-Comprehensive technical docs are built into the application at [`/docs`](http://localhost:4200/docs) — covering architecture, data flow, every service in depth, API reference, infrastructure, and lessons learned.
-
-To preview the docs locally:
-
-```bash
-cd docs
-pip install -r requirements.txt
-mkdocs serve
-```
+Comprehensive technical docs at [cognilight.muchagato.dev/docs](https://cognilight.muchagato.dev/docs) (or locally at [localhost:4200/docs](http://localhost:4200/docs)) — covering architecture, data flow, every service in depth, API reference, infrastructure, and lessons learned.
