@@ -81,7 +81,7 @@ The stream emits four event types in order:
 
 | Event | When | Payload | UI Effect |
 |-------|------|---------|-----------|
-| `sql_context` | Always, first | SQL queries + results | Show expandable "Data Sources" panel |
+| `sql_context` | Always, first | LLM-generated SQL queries + results | Show expandable "Data Sources" panel |
 | `sources` | If RAG triggered | Incident log excerpts | Show expandable "Incident Logs" panel |
 | `token` | During LLM streaming | Text fragment | Append to message, re-render markdown |
 | `done` | End of response | Empty | Stop loading indicator |

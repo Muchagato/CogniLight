@@ -133,17 +133,23 @@ sequenceDiagram
     User->>FE: "Which poles have had repairs?"
     FE->>AI: POST /api/chat/stream<br/>Headers: X-LLM-API-Key, X-LLM-Provider
 
-    AI->>DB: SQL: latest reading per pole
-    AI->>DB: SQL: recent anomalies (top 20)
-    AI->>DB: SQL: simulation time range
+    AI->>DB: Get table schema
+    AI->>LLM: Generate SQL queries (non-streaming)
+    LLM-->>AI: JSON array of queries
+    AI->>DB: Execute generated queries
+    alt Any queries failed
+        AI->>LLM: Send errors, ask for fixes (non-streaming)
+        LLM-->>AI: Fixed queries
+        AI->>DB: Execute fixed queries
+    end
     AI-->>FE: SSE event: sql_context (queries + results)
 
-    AI->>AI: _sql_only("repairs") → False (not trivial factual)
+    AI->>AI: _needs_rag("repairs") → True
     AI->>FAISS: Semantic search (top 5 chunks)
     AI-->>FE: SSE event: sources (incident log excerpts)
 
-    AI->>AI: Build prompt (system + SQL context + RAG context + query)
-    AI->>LLM: Stream request (BYOK credentials)
+    AI->>AI: Build prompt (system + query results + RAG context + query)
+    AI->>LLM: Stream answer (BYOK credentials)
 
     loop Token streaming
         LLM-->>AI: Token chunk
@@ -156,11 +162,13 @@ sequenceDiagram
 
 **Key design choices visible here:**
 
-1. **SQL context is always included** — every query gets fresh network state, regardless of whether RAG is needed. This ensures the LLM always knows "what's happening now."
-2. **RAG is included by default** — incident log context is added to every query unless it matches a narrow `_SQL_ONLY_KEYWORDS` pattern (trivial factual lookups like "what time is it"). This opt-out approach ensures the LLM has narrative context for the vast majority of queries.
-3. **BYOK (Bring Your Own Key)** — the API key is sent per-request in HTTP headers, never stored server-side. The frontend persists it in `localStorage`.
-4. **Structured SSE events** — before any LLM tokens arrive, the frontend receives `sql_context` and `sources` events. This allows the UI to show "what data the AI is looking at" as expandable panels.
-5. **Streaming** — tokens arrive one-by-one via SSE, rendered as they arrive with markdown formatting.
+1. **Text-to-SQL** — instead of hardcoded queries, the LLM generates targeted SQL based on the user's question. This means the AI fetches exactly the data it needs to answer, rather than always pulling the same three snapshots.
+2. **Retry on failure** — if any generated queries fail, the errors are sent back to the LLM for correction. This makes the pipeline resilient to minor SQL mistakes.
+3. **Safety constraints** — only SELECT queries are allowed; results are capped at 200 rows per query. If the LLM generates no queries, a simple `SELECT * LIMIT 50` fallback is used.
+4. **RAG is included by default** — incident log context is added to every query unless it matches a narrow `_SQL_ONLY_KEYWORDS` pattern (trivial factual lookups like "what time is it"). This opt-out approach ensures the LLM has narrative context for the vast majority of queries.
+5. **BYOK (Bring Your Own Key)** — the API key is sent per-request in HTTP headers, never stored server-side. The frontend persists it in `localStorage`.
+6. **Structured SSE events** — before any LLM tokens arrive, the frontend receives `sql_context` and `sources` events. This allows the UI to show "what data the AI is looking at" as expandable panels.
+7. **Streaming** — tokens arrive one-by-one via SSE, rendered as they arrive with markdown formatting.
 
 ---
 

@@ -33,7 +33,7 @@ Three services sharing a single SQLite database. Backend is the sole writer; AI 
 
 - **Real-time:** SignalR pushes telemetry (1s ticks) and incident logs. Never poll for live data.
 - **Historical:** REST endpoints with bucketed aggregation for time-range queries.
-- **AI Chat:** SSE streaming. Hybrid SQL (always) + RAG over incident logs (default-on, skipped only for trivial factual queries).
+- **AI Chat:** SSE streaming. Text-to-SQL (LLM generates queries per question) + RAG over incident logs (default-on, skipped only for trivial factual queries).
 - **LLM:** BYOK model — API key stored in browser localStorage, sent per-request via `X-LLM-*` headers. Supports Anthropic and OpenAI providers.
 
 ## Key Files
@@ -47,8 +47,8 @@ Three services sharing a single SQLite database. Backend is the sole writer; AI 
 | Canvas renderer | `frontend/src/app/simulation/simulation.renderer.ts` + `renderer/` |
 | SignalR + REST client | `frontend/src/app/shared/services/telemetry.service.ts` |
 | Chat SSE streaming | `frontend/src/app/chat/chat.component.ts` |
-| RAG pipeline + LLM calls | `ai-service/rag/chain.py` |
-| SQL context builder | `ai-service/rag/sql_context.py` |
+| Text-to-SQL + RAG pipeline | `ai-service/rag/chain.py` |
+| SQL execution + formatting | `ai-service/rag/sql_context.py` |
 | FAISS retriever | `ai-service/rag/retriever.py` |
 | Nginx reverse proxy | `frontend/nginx.conf` |
 

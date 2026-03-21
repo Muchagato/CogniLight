@@ -1,6 +1,7 @@
 :host {
   display: block;
   height: 100%;
+  container-type: inline-size;
 }
 
 .dashboard {
@@ -41,7 +42,7 @@
 // --- KPI Row ---
 .kpi-row {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
   flex-shrink: 0;
 }
@@ -75,12 +76,6 @@
     transform: translateY(-1px);
   }
 
-  &.alert {
-    border-color: var(--cl-red);
-    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.3), 0 0 16px rgba(239, 68, 68, 0.08);
-
-    &::before { background: var(--cl-red); }
-  }
 }
 
 // Per-KPI accent colors
@@ -89,6 +84,7 @@
 .kpi-card:nth-child(3)::before { background: var(--cl-amber-light); }
 .kpi-card:nth-child(4)::before { background: var(--cl-green); }
 .kpi-card:nth-child(5)::before { background: var(--cl-red); }
+.kpi-card:nth-child(6)::before { background: var(--cl-cyan); }
 
 .kpi-header {
   display: flex;
@@ -124,6 +120,7 @@
   &.moderate { color: var(--cl-amber); }
   &.unhealthy { color: var(--cl-red); }
   &.anomaly { color: var(--cl-red); }
+  &.incident { color: var(--cl-cyan); }
 }
 
 .kpi-subtitle {
@@ -644,8 +641,8 @@
   }
 }
 
-// Responsive — tablet
-@media (max-width: 1200px) {
+// Responsive — container queries (react to actual dashboard width, not viewport)
+@container (max-width: 800px) {
   .kpi-row {
     grid-template-columns: repeat(3, 1fr);
   }
@@ -657,14 +654,12 @@
   }
 }
 
-// Responsive — mobile
-@media (max-width: 768px) {
+@container (max-width: 500px) {
   .dashboard {
     padding: 12px;
     gap: 10px;
     overflow-y: auto;
     overflow-x: hidden;
-    max-width: 100vw;
   }
 
   .kpi-row {
@@ -752,5 +747,12 @@
   .side-panels {
     gap: 10px;
     min-width: 0;
+  }
+}
+
+// Mobile viewport — hide elements via layout service
+@media (max-width: 768px) {
+  .dashboard {
+    max-width: 100vw;
   }
 }

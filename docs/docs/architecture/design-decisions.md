@@ -78,9 +78,9 @@ All broadcasting is done via `IHubContext<TelemetryHub>` from the `SimulationEng
 
 ---
 
-## Hybrid SQL + RAG vs. Pure RAG
+## Text-to-SQL + RAG vs. Hardcoded SQL vs. Pure RAG
 
-**Decision:** The AI chat uses both direct SQL queries and RAG over incident logs, not just one or the other.
+**Decision:** The AI chat uses LLM-generated SQL queries (text-to-SQL) for structured data and RAG over incident logs for narrative context.
 
 **Why pure RAG wouldn't work:**
 
@@ -90,9 +90,15 @@ The LLM needs to know *current* network state — "which poles are consuming the
 
 Incident logs are free-text narratives ("Found corroded wiring at junction box. Applied temporary fix..."). SQL can fetch them, but the user's question might be "have there been any recurring sensor problems?" — that's a semantic query that needs similarity matching, not `WHERE text LIKE '%sensor%'`.
 
+**Why text-to-SQL instead of hardcoded queries:**
+
+An earlier version ran three fixed queries on every request (latest per-pole snapshot, recent anomalies, time range). This was simple but wasteful — the LLM always received the same data regardless of the question. Text-to-SQL lets the LLM generate targeted queries for each question, fetching exactly the data it needs. A retry mechanism handles SQL errors by sending them back to the LLM for correction.
+
+**Safety:** Only SELECT queries are allowed, and results are capped at 200 rows per query. If the LLM generates no queries, a `SELECT * LIMIT 50` fallback ensures the pipeline never runs empty.
+
 **The hybrid approach:**
 
-1. **Every query** gets fresh SQL context: current readings per pole, rankings, recent anomalies
+1. **Every query** gets LLM-generated SQL context: the LLM decides what data to fetch based on the question
 2. **RAG context is included by default** — incident logs from FAISS are added to every query unless it matches a narrow set of trivial factual patterns (e.g., "what time is it", "how many poles")
 
 The query router uses an opt-out approach: a `_SQL_ONLY_KEYWORDS` regex identifies the small set of queries where incident logs add no value. Everything else gets RAG context automatically. This is simpler and more robust than trying to enumerate all the keywords that *should* trigger RAG.
