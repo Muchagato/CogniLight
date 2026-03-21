@@ -33,12 +33,20 @@
       <span class="kpi-value" [ngClass]="aqiClass(avgAqi)">{{ avgAqi }}</span>
       @if (!isLive) { <span class="kpi-subtitle">{{ activeRangeLabel() }}</span> }
     </div>
-    <div class="kpi-card" [class.alert]="activeAnomalies > 0">
+    <div class="kpi-card">
       <div class="kpi-header">
         <span class="kpi-icon">⚠️</span>
         <span class="kpi-label">{{ isLive ? 'Anomalies' : 'Total Anomalies' }}</span>
       </div>
       <span class="kpi-value anomaly">{{ activeAnomalies }}</span>
+      @if (!isLive) { <span class="kpi-subtitle">{{ activeRangeLabel() }}</span> }
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-header">
+        <span class="kpi-icon">&#128203;</span>
+        <span class="kpi-label">{{ isLive ? 'Incidents' : 'Total Incidents' }}</span>
+      </div>
+      <span class="kpi-value incident">{{ incidentLogs.length }}</span>
       @if (!isLive) { <span class="kpi-subtitle">{{ activeRangeLabel() }}</span> }
     </div>
   </div>
