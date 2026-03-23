@@ -290,6 +290,7 @@ export class DashboardComponent implements OnDestroy {
   private async fetchPoleHistory(): Promise<void> {
     if (this.isLive || !this.selectedPoleId) {
       this.historicalPoleData = [];
+      this.updateCharts();
       return;
     }
 
